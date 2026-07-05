@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeFlow – Anleitung</title>
+<style>
+  :root{
+    --bg:#0E1116; --card:#161B26; --card2:#1E2433;
+    --violet:#8B7CF7; --blue:#3D8BFD; --pink:#F062A6; --green:#34D399;
+    --text:#F2F3F7; --sec:#8A93A6; --line:#2A3040;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.55;
+    padding:16px 14px 60px}
+  header{padding:28px 6px 18px}
+  h1{margin:0; font-size:30px; background:linear-gradient(90deg,var(--violet),var(--pink));
+    -webkit-background-clip:text; background-clip:text; color:transparent}
+  header p{color:var(--sec); margin:6px 0 0; font-size:14px}
+  .card{background:linear-gradient(135deg,#232A3D,#161B26); border:1px solid var(--line);
+    border-radius:18px; padding:16px; margin:12px 0}
+  h2{font-size:15px; letter-spacing:.06em; text-transform:uppercase; color:var(--sec);
+    margin:26px 6px 4px}
+  details{background:var(--card); border:1px solid var(--line); border-radius:16px;
+    margin:10px 0; overflow:hidden}
+  summary{list-style:none; cursor:pointer; padding:15px 16px; font-weight:600; font-size:16px;
+    display:flex; align-items:center; gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary .ico{width:34px; height:34px; border-radius:10px; display:flex; align-items:center;
+    justify-content:center; font-size:17px; flex-shrink:0; background:var(--card2)}
+  summary::after{content:"›"; margin-left:auto; color:var(--sec); font-size:22px;
+    transform:rotate(90deg); transition:transform .2s}
+  details[open] summary::after{transform:rotate(-90deg)}
+  .inner{padding:2px 16px 16px; color:#C9CFDD; font-size:15px}
+  .inner b{color:var(--text)}
+  .step{display:flex; gap:12px; margin:10px 0}
+  .num{width:24px; height:24px; border-radius:50%; background:var(--violet); color:#fff;
+    font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:2px}
+  .tip{background:var(--card2); border-left:3px solid var(--blue); border-radius:10px;
+    padding:10px 12px; margin:10px 0; font-size:14px; color:#C9CFDD}
+  .warn{border-left-color:var(--pink)}
+  .ok{border-left-color:var(--green)}
+  table{width:100%; border-collapse:collapse; font-size:14px; margin:8px 0}
+  td{padding:9px 8px; border-top:1px solid var(--line); vertical-align:top}
+  td:first-child{color:var(--text); font-weight:600; width:44%}
+  td:last-child{color:#C9CFDD}
+  code{background:var(--card2); padding:2px 6px; border-radius:6px; font-size:13px; color:var(--green)}
+  .grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px}
+  .grid div{background:var(--card2); border-radius:12px; padding:10px; text-align:center; font-size:13px}
+  .grid b{display:block; font-size:19px; margin-bottom:3px}
+  footer{color:var(--sec); font-size:12px; text-align:center; margin-top:34px; line-height:1.7}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ HomeFlow</h1>
+  <p>Hue · Sonos · LG TV — lokal, sofort, ohne Cloud</p>
+</header>
+
+<div class="card">
+  <div class="grid">
+    <div><b>▶</b>Automationen<br>starten & verwalten</div>
+    <div><b>🏠</b>Geräte<br>direkt steuern</div>
+    <div><b>⚙️</b>Einstellungen<br>Key, Zeiten, Bias</div>
+  </div>
+</div>
+
+<h2>Erste Einrichtung (einmalig)</h2>
+
+<details open>
+  <summary><span class="ico">🔌</span>Geräte verbinden</summary>
+  <div class="inner">
+    <div class="step"><div class="num">1</div><div><b>Hue:</b> Geräte-Tab → Bridge-IP eintragen (Hue-App → Einstellungen → Meine Hue-Systeme) → runden Knopf auf der Bridge drücken → <b>Koppeln</b></div></div>
+    <div class="step"><div class="num">2</div><div><b>Sonos:</b> Geräte-Tab → <b>Suchen</b> — Beam & Era 100 erscheinen automatisch</div></div>
+    <div class="step"><div class="num">3</div><div><b>LG TV:</b> Name, IP & MAC eintragen (TV: Einstellungen → Netzwerk → WLAN → Erweitert) → <b>TV hinzufügen</b> → <b>Koppeln</b> → am TV bestätigen</div></div>
+    <div class="step"><div class="num">4</div><div><b>Claude-Key:</b> Einstellungen-Tab → API-Key von <b>console.anthropic.com</b> einfügen (5 $ Guthaben reicht lange)</div></div>
+  </div>
+</details>
+
+<h2>Täglich nutzen</h2>
+
+<details>
+  <summary><span class="ico">💬</span>Automation per Sprache erstellen</summary>
+  <div class="inner">
+    Automationen-Tab → <b>+</b> → „Neue Automation“ → einfach beschreiben:
+    <div class="tip">„Wenn ich den NFC-Tag berühre: alle Lichter aus, Sonos pausieren, TV aus.“</div>
+    → <b>Los</b>. Claude baut die Routine, du prüfst die Aktionen → <b>Speichern</b>.
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">▶️</span>Automationen starten & schalten</summary>
+  <div class="inner">
+    <b>▶</b> = sofort ausführen · <b>Schalter</b> = Trigger aktiv/inaktiv · <b>Antippen</b> = öffnen & bearbeiten
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">🎬</span>Szene aufnehmen (Scene Sync)</summary>
+  <div class="inner">
+    <div class="step"><div class="num">1</div><div>Licht & Musik <b>jetzt</b> so einstellen, wie die Szene sein soll</div></div>
+    <div class="step"><div class="num">2</div><div><b>+</b> → „Szene aus aktuellem Zustand aufnehmen“</div></div>
+    <div class="step"><div class="num">3</div><div>Geräte anhaken, beim Beam optional <b>Night-Mode</b> → Name („Movie Night“) → speichern</div></div>
+    Farbe, Helligkeit, Lautstärke & laufende Wiedergabe werden eingefroren.
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">📱</span>Widget & NFC-Tag</summary>
+  <div class="inner">
+    <b>Widget:</b> Homescreen lange drücken → Widgets → HomeFlow → platzieren → Automation wählen. Ein Tipp startet sie.<br><br>
+    <b>NFC:</b> Automation öffnen → Auslöser <b>NFC</b> → „NFC-Tag beschreiben“ → Tag an die Handy-Rückseite halten.
+    <div class="tip">Tag antippen startet die Routine sofort — Bildschirm muss entsperrt sein (Android-Vorgabe).</div>
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">🔴</span>Alles aus</summary>
+  <div class="inner">Geräte-Tab → <b>„Alles aus“</b> oben rechts: alle Lampen, Sonos & TV gleichzeitig, in unter einer halben Sekunde.</div>
+</details>
+
+<h2>Fortgeschritten</h2>
+
+<details>
+  <summary><span class="ico">🌗</span>Tag/Nacht-Varianten</summary>
+  <div class="inner">
+    Eine Automation kann sich tags/nachts unterscheiden (grün + Vögel / blau gedimmt + Wale). Bei Claude einfach mitbeschreiben oder im Editor <b>„+ Tag/Nacht-Variante“</b>. Zeiten (Standard 07:00 / 22:00) in den Einstellungen.
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">💡</span>Geräte-Trigger („wenn Badlicht angeht“)</summary>
+  <div class="inner">
+    Auslöser <b>Hue-Licht</b> → Lampe wählen → „wird eingeschaltet“. Läuft über einen Hintergrunddienst.
+    <div class="tip warn"><b>Samsung-Pflicht:</b> Einstellungen → Apps → HomeFlow → Akku → <b>Nicht optimiert</b> — sonst wird der Dienst beendet.</div>
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">📺</span>TV Bias-Light (ohne Sync-Box)</summary>
+  <div class="inner">
+    Einstellungen → <b>TV Bias-Light</b> aktivieren → Lightstrips anhaken. Je nach TV-Inhalt:
+    <table>
+      <tr><td>Netflix / Prime / HDMI</td><td>warmes dunkles Orange</td></tr>
+      <tr><td>YouTube</td><td>Violett</td></tr>
+      <tr><td>Live-TV</td><td>kühles Blau</td></tr>
+      <tr><td>TV aus</td><td>Strips aus</td></tr>
+    </table>
+    <div class="tip">Ehrlich: Stimmung nach Content-Typ, Reaktion ~5 s. Frame-genaues Ambilight braucht HDMI-Capture-Hardware — gibt die TV-API nicht her.</div>
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">🌍</span>Unterwegs steuern (Tailscale)</summary>
+  <div class="inner">
+    <div class="step"><div class="num">1</div><div>Tailscale-App auf dem Handy installieren, anmelden</div></div>
+    <div class="step"><div class="num">2</div><div>Tailscale auf einem Gerät zuhause, das durchläuft: <code>tailscale up --advertise-routes=192.168.178.0/24</code></div></div>
+    <div class="step"><div class="num">3</div><div>Route auf login.tailscale.com freigeben</div></div>
+    <div class="tip ok">VPN an = HomeFlow funktioniert unterwegs exakt wie zuhause.</div>
+  </div>
+</details>
+
+<details>
+  <summary><span class="ico">🔊</span>Sound-URLs (Vögel, Wale …)</summary>
+  <div class="inner">
+    Zeigt eine Aktion <b>⚠ Sound-URL fehlt</b>: antippen, URL eintragen. Quellen: Internetradio-Naturgeräusch-Sender oder eigene MP3 vom Heimrechner (<code>python -m http.server</code> → <code>http://PC-IP:8000/voegel.mp3</code>).
+  </div>
+</details>
+
+<h2>Probleme & Lösungen</h2>
+
+<details>
+  <summary><span class="ico">🛠️</span>Wenn etwas nicht funktioniert</summary>
+  <div class="inner">
+    <table>
+      <tr><td>Hue koppelt nicht</td><td>Bridge-Knopf drücken, innerhalb 30 s koppeln. IP & WLAN prüfen</td></tr>
+      <tr><td>Sonos nicht gefunden</td><td>Gleiches WLAN (kein Gäste-WLAN)? Nochmal suchen</td></tr>
+      <tr><td>TV-Kopplung scheitert</td><td>TV muss an sein · IP prüfen · „LG Connect Apps“ am TV erlauben</td></tr>
+      <tr><td>TV geht nicht AN</td><td>MAC eingetragen? „Einschalten über WLAN“ am TV aktiv? Nach Stromlos-Zustand prinzipiell unmöglich</td></tr>
+      <tr><td>Trigger/Bias stoppt nach Stunden</td><td>Akku-Optimierung ausschalten (s. o.) — Benachrichtigung „HomeFlow aktiv“ muss sichtbar sein</td></tr>
+      <tr><td>NFC reagiert nicht</td><td>Bildschirm entsperren · NFC an · Tag an obere Rückseite</td></tr>
+      <tr><td>Claude-Fehler</td><td>API-Key & Guthaben prüfen · Internet nötig (nur beim Erstellen)</td></tr>
+      <tr><td>Spotify-Szene unvollständig</td><td>Sonos-Grenze: Quelle ja, exakte Queue-Position nicht immer</td></tr>
+      <tr><td>Era 100 + Night-Mode = Fehler</td><td>Normal — Night-Mode nur Beam/Arc</td></tr>
+      <tr><td>Neue Version bauen</td><td>Dateien ins Repo (Ordner <code>HomeFlow/</code>) → Actions → Artifact laden → APK drüberinstallieren</td></tr>
+    </table>
+  </div>
+</details>
+
+<footer>
+  HomeFlow v1.0 · Steuerung 100 % lokal (Hue CLIP v2 · Sonos UPnP · LG webOS)<br>
+  Claude-API nur beim Erstellen von Automationen
+</footer>
+
+</body>
+</html>
