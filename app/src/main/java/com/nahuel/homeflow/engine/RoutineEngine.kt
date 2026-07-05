@@ -75,6 +75,7 @@ object RoutineEngine {
                 if (uri.isBlank()) Result.failure(IllegalArgumentException("Sonos: keine Sound-URL gesetzt"))
                 else SonosClient.playUri(a.deviceId, uri, a.params["volume"]?.toIntOrNull(), a.params["meta"].orEmpty())
             }
+            "mute" -> SonosClient.setMute(a.deviceId, a.params["on"] != "false")
             "night_mode" -> SonosClient.setNightMode(a.deviceId, a.params["on"] != "false")
             "dialog_level" -> SonosClient.setDialogLevel(a.deviceId, a.params["on"] != "false")
             else -> Result.failure(IllegalArgumentException("Sonos: unbekanntes Kommando ${a.command}"))
