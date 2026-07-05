@@ -282,6 +282,7 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
                 "play" -> "Play"; "pause" -> "Pause"; "stop" -> "Stopp"
                 "volume" -> "Lautstärke ${a.params["volume"]} %"
                 "play_uri" -> "Wiedergabe starten" + (a.params["volume"]?.let { " ($it %)" } ?: "")
+                "mute" -> "Stumm " + (if (a.params["on"] == "false") "aus" else "ein")
                 "night_mode" -> "Night-Mode " + (if (a.params["on"] == "false") "aus" else "ein")
                 "dialog_level" -> "Sprachverbesserung " + (if (a.params["on"] == "false") "aus" else "ein")
                 else -> a.command
@@ -416,11 +417,11 @@ private fun ActionDialog(
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
+                            listOf("mute" to "Stumm", "night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
                                 FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
                             }
                         }
-                        if (command == "night_mode" || command == "dialog_level") {
+                        if (command == "mute" || command == "night_mode" || command == "dialog_level") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilterChip(selected = onState != "false", onClick = { onState = "true" }, label = { Text("Ein") })
                                 FilterChip(selected = onState == "false", onClick = { onState = "false" }, label = { Text("Aus") })
@@ -462,7 +463,7 @@ private fun ActionDialog(
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                         if (command == "play_uri") params["uri"] = uri.trim()
-                        if (command == "night_mode" || command == "dialog_level")
+                        if (command == "mute" || command == "night_mode" || command == "dialog_level")
                             params["on"] = if (onState == "false") "false" else "true"
                     }
                     TargetType.LG_TV -> volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
