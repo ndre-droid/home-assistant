@@ -11,6 +11,7 @@ import com.nahuel.homeflow.MainActivity
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.data.TriggerType
 import com.nahuel.homeflow.devices.HueClient
+import com.nahuel.homeflow.devices.LgTvClient
 import kotlinx.coroutines.*
 import okhttp3.sse.EventSource
 
@@ -23,6 +24,7 @@ class TriggerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var eventSource: EventSource? = null
     private var watcher: Job? = null
+    private var biasWatcher: Job? = null
 
     companion object {
         const val CHANNEL_ID = "homeflow_trigger"
@@ -30,10 +32,11 @@ class TriggerService : Service() {
         fun hasStateTriggers(): Boolean =
             Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.DEVICE_STATE }
 
-        /** Starts or stops the service depending on whether any state trigger exists. */
+        /** Starts or stops the service depending on whether any background work exists. */
         fun sync(ctx: Context) {
             val intent = Intent(ctx, TriggerService::class.java)
-            if (hasStateTriggers() && Store.config.value.hueBridgeIp.isNotEmpty()) {
+            val needed = hasStateTriggers() || Store.config.value.biasEnabled
+            if (needed && Store.config.value.hueBridgeIp.isNotEmpty()) {
                 if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(intent) else ctx.startService(intent)
             } else {
                 ctx.stopService(intent)
@@ -51,7 +54,53 @@ class TriggerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startInForeground()
         if (watcher == null) watcher = scope.launch { connectLoop() }
+        if (biasWatcher == null) biasWatcher = scope.launch { biasLoop() }
         return START_STICKY
+    }
+
+    // ---------- TV bias lighting (content-type mood, no sync box) ----------
+
+    /** appId -> (colorHex, brightnessPct). Approximate mood per content type. */
+    private fun moodFor(appId: String): Pair<String, Int> = when {
+        appId.contains("netflix") || appId.contains("amazon") || appId.contains("disney") ||
+                appId.contains("appletv") || appId.contains("hbo") || appId.contains("wow") ->
+            "#FF8A3C" to 12                                  // Film/Serie: warmes, dunkles Orange
+        appId.contains("hdmi") -> "#FF8A3C" to 12            // Konsole/Player: wie Kino
+        appId.contains("youtube") -> "#8B7CF7" to 25         // YouTube: violett, etwas heller
+        appId.contains("livetv") -> "#3D8BFD" to 20          // Live-TV: kühles Blau
+        else -> "#FFD9A0" to 25                              // Home/unbekannt: sanftes Warmweiß
+    }
+
+    private suspend fun biasLoop() {
+        var lastApp: String? = null
+        var tvWasOn = false
+        while (true) {
+            val cfg = Store.config.value
+            if (cfg.biasEnabled && cfg.biasLights.isNotEmpty() && cfg.tvs.isNotEmpty()) {
+                val tv = cfg.tvs.firstOrNull { it.ip == cfg.biasTv } ?: cfg.tvs.first()
+                val app = if (tv.clientKey.isNotEmpty())
+                    LgTvClient.getForegroundApp(tv.ip, tv.clientKey).getOrNull() else null
+                if (app != null) {
+                    tvWasOn = true
+                    if (app != lastApp) {
+                        lastApp = app
+                        val (color, bri) = moodFor(app)
+                        cfg.biasLights.forEach { id ->
+                            HueClient.setLight(id, on = true, brightness = bri, colorHex = color)
+                        }
+                    }
+                } else if (tvWasOn) {
+                    // TV ging aus -> Bias-Licht aus
+                    tvWasOn = false; lastApp = null
+                    cfg.biasLights.forEach { id ->
+                        HueClient.setLight(id, on = false, brightness = null, colorHex = null)
+                    }
+                }
+            } else {
+                lastApp = null
+            }
+            delay(5_000)
+        }
     }
 
     private suspend fun connectLoop() {
@@ -104,7 +153,7 @@ class TriggerService : Service() {
 
     override fun onDestroy() {
         eventSource?.cancel()
-        scope.cancel()
+        scope.cancel()   // beendet auch den Bias-Loop
         super.onDestroy()
     }
 }

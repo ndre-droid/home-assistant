@@ -125,7 +125,11 @@ data class Config(
     val anthropicKey: String = "",
     val model: String = "claude-sonnet-5",
     val dayStart: String = "07:00",
-    val nightStart: String = "22:00"
+    val nightStart: String = "22:00",
+    // TV bias lighting: content-type mood on selected lights while the TV runs
+    val biasEnabled: Boolean = false,
+    val biasTv: String = "",
+    val biasLights: List<String> = emptyList()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -140,6 +144,8 @@ data class Config(
         })
         put("anthropicKey", anthropicKey); put("model", model)
         put("dayStart", dayStart); put("nightStart", nightStart)
+        put("biasEnabled", biasEnabled); put("biasTv", biasTv)
+        put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
     }
 
     companion object {
@@ -166,7 +172,12 @@ data class Config(
                 anthropicKey = o.optString("anthropicKey"),
                 model = o.optString("model", "claude-sonnet-5"),
                 dayStart = o.optString("dayStart", "07:00"),
-                nightStart = o.optString("nightStart", "22:00")
+                nightStart = o.optString("nightStart", "22:00"),
+                biasEnabled = o.optBoolean("biasEnabled", false),
+                biasTv = o.optString("biasTv", ""),
+                biasLights = o.optJSONArray("biasLights")?.let { arr ->
+                    (0 until arr.length()).map { arr.getString(it) }
+                } ?: emptyList()
             )
         }
     }

@@ -109,6 +109,12 @@ object LgTvClient {
         session(ip, key, "ssap://audio/setMute", JSONObject().put("mute", mute)); Unit
     }
 
+    /** Foreground app id (netflix, youtube.leanback.v4, com.webos.app.hdmi2, ...). Fails fast if TV is off. */
+    suspend fun getForegroundApp(ip: String, key: String): Result<String> = runCatching {
+        val (_, payload) = session(ip, key, "ssap://com.webos.applicationManager/getForegroundAppInfo", null)
+        payload?.optString("appId").orEmpty().ifEmpty { error("Keine App-Info") }
+    }
+
     /** Wake-on-LAN magic packet. Requires MAC address + TV network standby enabled. */
     suspend fun powerOn(mac: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {

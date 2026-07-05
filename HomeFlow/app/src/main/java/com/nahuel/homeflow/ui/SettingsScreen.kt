@@ -12,11 +12,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import com.nahuel.homeflow.data.Store
+import com.nahuel.homeflow.devices.HueClient
+import com.nahuel.homeflow.devices.HueLight
+import com.nahuel.homeflow.engine.TriggerService
 
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val config by Store.config.collectAsState()
+    val ctx = LocalContext.current
+    var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
+    LaunchedEffect(config.hueAppKey) {
+        if (config.hueAppKey.isNotEmpty()) HueClient.lights().onSuccess { hueLights = it }
+    }
     var apiKey by remember(config.anthropicKey) { mutableStateOf(config.anthropicKey) }
     var model by remember(config.model) { mutableStateOf(config.model) }
     var dayStart by remember(config.dayStart) { mutableStateOf(config.dayStart) }
@@ -79,6 +89,45 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             colors = ButtonDefaults.buttonColors(containerColor = Violet),
             modifier = Modifier.fillMaxWidth()
         ) { Text("Speichern") }
+
+        GradientCard {
+            SectionTitle("TV Bias-Light (ohne Sync-Box)")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Aktiv", color = TextPrim, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = config.biasEnabled,
+                    onCheckedChange = { v ->
+                        Store.updateConfig {
+                            it.copy(biasEnabled = v, biasTv = it.biasTv.ifEmpty { it.tvs.firstOrNull()?.ip ?: "" })
+                        }
+                        TriggerService.sync(ctx)
+                    },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Violet, uncheckedTrackColor = Surface2)
+                )
+            }
+            if (config.biasEnabled) {
+                Spacer(Modifier.height(4.dp))
+                Text("Bias-Lampen (Lightstrips hinterm TV):", color = TextSec)
+                hueLights.forEach { l ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = l.id in config.biasLights,
+                            onCheckedChange = { c ->
+                                Store.updateConfig {
+                                    it.copy(biasLights = if (c) it.biasLights + l.id else it.biasLights - l.id)
+                                }
+                            },
+                            colors = CheckboxDefaults.colors(checkedColor = Violet)
+                        )
+                        Text(l.name, color = TextPrim)
+                    }
+                }
+                if (hueLights.isEmpty()) HintText("Erst Hue im Geräte-Tab koppeln.")
+                if (config.tvs.isEmpty()) HintText("Erst LG TV im Geräte-Tab anlegen + koppeln.")
+            }
+            Spacer(Modifier.height(4.dp))
+            HintText("Läuft der TV, färben sich die gewählten Lampen je nach Inhalt: Netflix/Prime/HDMI → warmes dunkles Orange, YouTube → Violett, Live-TV → Blau. TV aus → Lampen aus. Ehrlich: Das ist Stimmung nach Content-Typ (~5 s Reaktion), kein Frame-genaues Ambilight — dafür bräuchte es eine HDMI-Capture-Box, die API des TVs gibt Bildinhalte nicht her.")
+        }
 
         GradientCard {
             SectionTitle("Unterwegs steuern (Tailscale)")
