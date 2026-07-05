@@ -46,7 +46,14 @@ object SonosClient {
                 .build()
             suspend fun once(): String = client.newCall(req).execute().use { resp ->
                 val body = resp.body?.string() ?: ""
-                check(resp.isSuccessful) { "Sonos HTTP ${resp.code}: ${body.take(200)}" }
+                check(resp.isSuccessful) {
+                    when (Regex("<errorCode>(\\d+)</errorCode>").find(body)?.groupValues?.get(1)) {
+                        "701" -> "Keine Wiedergabequelle. Erst in der Sonos-App etwas abspielen (dann klappt Play/Pause) oder in der Automation \"Sound-URL\" verwenden."
+                        "402" -> "Ungültige Parameter (UPnP 402)"
+                        null -> "Sonos HTTP ${resp.code}"
+                        else -> "Sonos-Fehler ${Regex("<errorCode>(\\d+)</errorCode>").find(body)?.groupValues?.get(1)} bei $action"
+                    }
+                }
                 body
             }
             try {
@@ -91,6 +98,14 @@ object SonosClient {
             "<InstanceID>0</InstanceID><CurrentURI>${esc(uri)}</CurrentURI><CurrentURIMetaData>${esc(meta)}</CurrentURIMetaData>"
         )
         soap(ip, "AVTransport", "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit
+    }
+
+    /** Mute works for EVERY source - including live TV audio via HDMI-ARC. */
+    suspend fun setMute(ip: String, mute: Boolean): Result<Unit> = runCatching {
+        soap(
+            ip, "RenderingControl", "SetMute",
+            "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${if (mute) 1 else 0}</DesiredMute>"
+        ); Unit
     }
 
     // ---------- EQ (Beam/Arc home-theater features, local API) ----------
