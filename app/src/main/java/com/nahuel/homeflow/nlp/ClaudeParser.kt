@@ -84,7 +84,7 @@ Rules:
 - NFC when the user mentions an NFC tag/chip. MANUAL for button/widget triggers or when unclear.
 - If the user distinguishes day/night (tagsüber/nachts), create one DAY and one NIGHT variant; otherwise a single ALWAYS variant. Day is ${cfg.dayStart}–${cfg.nightStart}.
 - HUE: command "set", deviceId = light id or "all"; params subset of {"on":"true|false","color":"#RRGGBB","brightness":"1-100"}.
-- SONOS: deviceId = speaker ip; commands: "play","pause","stop","volume"(params.volume 0-100),"play_uri"(params.uri, optional params.volume),"night_mode"(params.on "true"/"false"; Beam/Arc only),"dialog_level"(params.on; speech enhancement, Beam/Arc only). For ambience sounds (birds, whales, rain...) use "play_uri" with params.uri="" — the app asks the user for a stream URL; still set a low volume if requested (leise ≈ 15). For movie/TV scenes on a Beam, consider night_mode at night.
+- SONOS: deviceId = speaker ip; commands: "play","pause","stop","volume"(params.volume 0-100),"play_uri"(params.uri, optional params.volume),"mute"(params.on "true"/"false"; works for ALL sources incl. TV audio via ARC - use this to silence TV sound on a Beam),"night_mode"(params.on "true"/"false"; Beam/Arc only),"dialog_level"(params.on; speech enhancement, Beam/Arc only). For ambience sounds (birds, whales, rain...) use "play_uri" with params.uri="" — the app asks the user for a stream URL; still set a low volume if requested (leise ≈ 15). For movie/TV scenes on a Beam, consider night_mode at night.
 - LG_TV: deviceId = tv ip; commands "on","off","volume"(params.volume),"mute".
 - "Alles aus" = HUE set on=false deviceId "all" + SONOS pause for every speaker + LG_TV off for every TV.
 
