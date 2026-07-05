@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
@@ -291,9 +292,11 @@ private fun SonosSection(config: Config, onStatus: (String) -> Unit) {
                     val found = SonosClient.discover()
                     if (found.isEmpty()) onStatus("Sonos: nichts gefunden (gleiches WLAN?)")
                     else Store.updateConfig { cfg ->
-                        val known = cfg.sonos.map { it.ip }.toSet()
-                        cfg.copy(sonos = cfg.sonos + found.filter { it.ip !in known })
-                    }
+                        // merge by room name: refreshes stale IPs instead of duplicating entries
+                        val byName = cfg.sonos.associateBy { it.name }.toMutableMap()
+                        found.forEach { f -> byName[f.name] = f }
+                        cfg.copy(sonos = byName.values.toList())
+                    }.also { onStatus("Sonos aktualisiert: ${found.joinToString { it.name }}") }
                     searching = false
                 }
             }) { Text(if (searching) "Suche…" else "Suchen", color = Violet, fontSize = 13.sp) }
@@ -314,17 +317,30 @@ private fun SonosRow(sp: SonosSpeaker, onStatus: (String) -> Unit) {
             Text(sp.name, color = TextPrim, modifier = Modifier.weight(1f))
             TextButton(onClick = {
                 scope.launch {
+                    SonosClient.setMute(sp.ip, true)
+                        .onSuccess { onStatus("${sp.name}: stumm ✓ (Play = wieder laut)") }
+                        .onFailure { onStatus("${sp.name}: ${it.message}") }
+                }
+            }) { Text("Stumm", color = Pink, fontSize = 13.sp) }
+            TextButton(onClick = {
+                scope.launch {
                     SonosClient.getVolume(sp.ip)
                         .onSuccess { onStatus("${sp.name}: erreichbar ✓ (Lautstärke $it %)") }
                         .onFailure { onStatus("${sp.name}: ${it.message}") }
                 }
             }) { Text("Test", color = Green, fontSize = 13.sp) }
             IconButton(onClick = {
-                scope.launch { SonosClient.play(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") } }
+                scope.launch {
+                    SonosClient.setMute(sp.ip, false)
+                    SonosClient.play(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") }
+                }
             }) { Icon(Icons.Filled.PlayArrow, "Play", tint = Green) }
             IconButton(onClick = {
                 scope.launch { SonosClient.pause(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") } }
             }) { Icon(Icons.Filled.Clear, "Pause", tint = TextSec) }
+            IconButton(onClick = {
+                Store.updateConfig { it.copy(sonos = it.sonos.filterNot { s -> s.ip == sp.ip }) }
+            }) { Icon(Icons.Filled.Delete, "Entfernen", tint = TextSec) }
         }
         Slider(
             value = volume, onValueChange = { volume = it },
