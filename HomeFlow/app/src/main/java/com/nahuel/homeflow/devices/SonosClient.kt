@@ -13,10 +13,17 @@ import java.net.SocketTimeoutException
 
 /**
  * Sonos local control via UPnP/SOAP on port 1400. Latency on LAN: ~100-300 ms.
- * No cloud account needed; works remotely through Tailscale like everything else.
+ * No cloud account needed. Night mode / dialog level are plain EQ calls and work
+ * on home-theater players (Beam, Arc); other players ignore them with an error.
  */
 object SonosClient {
     private val xml = "text/xml; charset=\"utf-8\"".toMediaType()
+
+    private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;")
+        .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
+
+    private fun unesc(s: String) = s.replace("&quot;", "\"").replace("&apos;", "'")
+        .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
     private suspend fun soap(ip: String, service: String, action: String, args: String): String =
         withContext(Dispatchers.IO) {
@@ -35,6 +42,8 @@ object SonosClient {
                 body
             }
         }
+
+    // ---------- Playback ----------
 
     suspend fun play(ip: String): Result<Unit> = runCatching {
         soap(ip, "AVTransport", "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit
@@ -55,18 +64,59 @@ object SonosClient {
         ); Unit
     }
 
-    /** Sets a stream/file URI (http(s), or x-rincon-mp3radio:// for radio) and starts playback. */
-    suspend fun playUri(ip: String, uri: String, volume: Int?): Result<Unit> = runCatching {
+    /** Sets a stream/file URI and starts playback. meta = plain DIDL-Lite XML (optional, from capture). */
+    suspend fun playUri(ip: String, uri: String, volume: Int?, meta: String = ""): Result<Unit> = runCatching {
         volume?.let { setVolume(ip, it).getOrThrow() }
-        val esc = uri.replace("&", "&amp;").replace("<", "&lt;")
         soap(
             ip, "AVTransport", "SetAVTransportURI",
-            "<InstanceID>0</InstanceID><CurrentURI>$esc</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>"
+            "<InstanceID>0</InstanceID><CurrentURI>${esc(uri)}</CurrentURI><CurrentURIMetaData>${esc(meta)}</CurrentURIMetaData>"
         )
         soap(ip, "AVTransport", "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit
     }
 
-    /** SSDP discovery: finds all Sonos players in the network within ~3 s. */
+    // ---------- EQ (Beam/Arc home-theater features, local API) ----------
+
+    /** Night mode: compresses dynamics for quiet evenings. */
+    suspend fun setNightMode(ip: String, on: Boolean): Result<Unit> = runCatching {
+        soap(
+            ip, "RenderingControl", "SetEQ",
+            "<InstanceID>0</InstanceID><EQType>NightMode</EQType><DesiredValue>${if (on) 1 else 0}</DesiredValue>"
+        ); Unit
+    }
+
+    /** Speech enhancement ("Sprachverbesserung"). */
+    suspend fun setDialogLevel(ip: String, on: Boolean): Result<Unit> = runCatching {
+        soap(
+            ip, "RenderingControl", "SetEQ",
+            "<InstanceID>0</InstanceID><EQType>DialogLevel</EQType><DesiredValue>${if (on) 1 else 0}</DesiredValue>"
+        ); Unit
+    }
+
+    // ---------- State readout (for scene capture) ----------
+
+    suspend fun getVolume(ip: String): Result<Int> = runCatching {
+        val r = soap(ip, "RenderingControl", "GetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel>")
+        Regex("<CurrentVolume>(\\d+)</CurrentVolume>").find(r)?.groupValues?.get(1)?.toInt()
+            ?: error("Volume nicht lesbar")
+    }
+
+    suspend fun isPlaying(ip: String): Boolean = runCatching {
+        val r = soap(ip, "AVTransport", "GetTransportInfo", "<InstanceID>0</InstanceID>")
+        Regex("<CurrentTransportState>([^<]+)</CurrentTransportState>").find(r)?.groupValues?.get(1) == "PLAYING"
+    }.getOrDefault(false)
+
+    /** Returns (uri, didlMeta) of the current source, both unescaped to plain form. */
+    suspend fun getMedia(ip: String): Result<Pair<String, String>> = runCatching {
+        val r = soap(ip, "AVTransport", "GetMediaInfo", "<InstanceID>0</InstanceID>")
+        val uri = Regex("<CurrentURI>(.*?)</CurrentURI>", RegexOption.DOT_MATCHES_ALL)
+            .find(r)?.groupValues?.get(1) ?: ""
+        val meta = Regex("<CurrentURIMetaData>(.*?)</CurrentURIMetaData>", RegexOption.DOT_MATCHES_ALL)
+            .find(r)?.groupValues?.get(1) ?: ""
+        unesc(uri) to (if (meta == "NOT_IMPLEMENTED") "" else unesc(meta))
+    }
+
+    // ---------- Discovery ----------
+
     suspend fun discover(): List<SonosSpeaker> = withContext(Dispatchers.IO) {
         val found = mutableMapOf<String, SonosSpeaker>()
         runCatching {

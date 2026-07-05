@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -23,7 +24,8 @@ import com.nahuel.homeflow.engine.RoutineEngine
 import com.nahuel.homeflow.engine.TriggerService
 
 @Composable
-fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit) {
+fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, onCaptureScene: () -> Unit) {
+    var showAddChooser = remember { androidx.compose.runtime.mutableStateOf(false) }
     val routines by Store.routines.collectAsState()
     val ctx = LocalContext.current
 
@@ -78,12 +80,32 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit) {
         }
 
         FloatingActionButton(
-            onClick = { onEdit("") },
+            onClick = { showAddChooser.value = true },
             containerColor = Violet,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
         ) { Icon(Icons.Filled.Add, "Neue Automation") }
+
+        if (showAddChooser.value) {
+            AlertDialog(
+                onDismissRequest = { showAddChooser.value = false },
+                containerColor = Surface1,
+                title = { Text("Was möchtest du anlegen?", color = TextPrim) },
+                text = {
+                    Column {
+                        TextButton(onClick = { showAddChooser.value = false; onEdit("") }) {
+                            Text("Neue Automation (Claude / manuell)", color = Violet)
+                        }
+                        TextButton(onClick = { showAddChooser.value = false; onCaptureScene() }) {
+                            Text("Szene aus aktuellem Zustand aufnehmen", color = Blue)
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { showAddChooser.value = false }) { Text("Abbrechen", color = TextSec) } }
+            )
+        }
     }
 }
 

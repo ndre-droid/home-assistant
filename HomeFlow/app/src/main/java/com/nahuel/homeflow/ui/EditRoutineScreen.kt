@@ -281,7 +281,9 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
             val label = when (a.command) {
                 "play" -> "Play"; "pause" -> "Pause"; "stop" -> "Stopp"
                 "volume" -> "Lautstärke ${a.params["volume"]} %"
-                "play_uri" -> "Sound abspielen" + (a.params["volume"]?.let { " ($it %)" } ?: "")
+                "play_uri" -> "Wiedergabe starten" + (a.params["volume"]?.let { " ($it %)" } ?: "")
+                "night_mode" -> "Night-Mode " + (if (a.params["on"] == "false") "aus" else "ein")
+                "dialog_level" -> "Sprachverbesserung " + (if (a.params["on"] == "false") "aus" else "ein")
                 else -> a.command
             }
             "🔊 $dev: $label"
@@ -403,9 +405,25 @@ private fun ActionDialog(
                     }
                     TargetType.SONOS -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("play" to "Play", "pause" to "Pause", "stop" to "Stopp",
-                                "volume" to "Lautstärke", "play_uri" to "Sound-URL").forEach { (c, l) ->
+                            listOf("play" to "Play", "pause" to "Pause", "stop" to "Stopp")
+                                .forEach { (c, l) ->
+                                    FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
+                                }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("volume" to "Lautstärke", "play_uri" to "Sound-URL").forEach { (c, l) ->
                                 FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
+                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
+                            }
+                        }
+                        if (command == "night_mode" || command == "dialog_level") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(selected = onState != "false", onClick = { onState = "true" }, label = { Text("Ein") })
+                                FilterChip(selected = onState == "false", onClick = { onState = "false" }, label = { Text("Aus") })
                             }
                         }
                         if (command == "volume" || command == "play_uri") {
@@ -444,6 +462,8 @@ private fun ActionDialog(
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                         if (command == "play_uri") params["uri"] = uri.trim()
+                        if (command == "night_mode" || command == "dialog_level")
+                            params["on"] = if (onState == "false") "false" else "true"
                     }
                     TargetType.LG_TV -> volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                 }

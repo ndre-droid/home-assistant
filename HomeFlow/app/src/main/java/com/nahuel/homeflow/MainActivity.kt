@@ -111,8 +111,11 @@ private fun AppRoot(
     var tab by remember { mutableStateOf(Tab.AUTOMATIONS) }
     var editRoutineId by remember { mutableStateOf<String?>(null) }   // null = list, "" = new
     var showEditor by remember { mutableStateOf(false) }
+    var showCapture by remember { mutableStateOf(false) }
 
-    if (showEditor) {
+    if (showCapture) {
+        SceneCaptureScreen(onClose = { showCapture = false })
+    } else if (showEditor) {
         EditRoutineScreen(
             routineId = editRoutineId,
             onClose = { showEditor = false },
@@ -143,7 +146,7 @@ private fun AppRoot(
         ) { pad ->
             val mod = Modifier.padding(pad)
             when (tab) {
-                Tab.AUTOMATIONS -> AutomationsScreen(mod) { id -> editRoutineId = id; showEditor = true }
+                Tab.AUTOMATIONS -> AutomationsScreen(mod, onEdit = { id -> editRoutineId = id; showEditor = true }, onCaptureScene = { showCapture = true })
                 Tab.DEVICES -> DevicesScreen(mod)
                 Tab.SETTINGS -> SettingsScreen(mod)
             }

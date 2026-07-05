@@ -13,7 +13,11 @@ import okhttp3.sse.EventSources
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class HueLight(val id: String, val name: String, val on: Boolean, val supportsColor: Boolean)
+data class HueLight(
+    val id: String, val name: String, val on: Boolean, val supportsColor: Boolean,
+    val brightness: Int = 100,          // 1..100
+    val colorHex: String? = null        // current color, if the light has one
+)
 
 /** Philips Hue bridge, local CLIP v2 API. Latency on LAN: typically < 100 ms. */
 object HueClient {
@@ -49,11 +53,14 @@ object HueClient {
                 val data = JSONObject(resp.body!!.string()).getJSONArray("data")
                 (0 until data.length()).map { i ->
                     val l = data.getJSONObject(i)
+                    val xy = l.optJSONObject("color")?.optJSONObject("xy")
                     HueLight(
                         id = l.getString("id"),
                         name = l.optJSONObject("metadata")?.optString("name") ?: "Lampe",
                         on = l.optJSONObject("on")?.optBoolean("on") ?: false,
-                        supportsColor = l.has("color")
+                        supportsColor = l.has("color"),
+                        brightness = (l.optJSONObject("dimming")?.optDouble("brightness", 100.0) ?: 100.0).toInt().coerceIn(1, 100),
+                        colorHex = xy?.let { c -> xyToHex(c.optDouble("x", 0.3127), c.optDouble("y", 0.3290)) }
                     )
                 }
             }
@@ -124,5 +131,24 @@ object HueClient {
         val z = rl * 0.0193 + gl * 0.1192 + bl * 0.9505
         val sum = x + y + z
         return if (sum == 0.0) 0.3127 to 0.3290 else (x / sum) to (y / sum)
+    }
+
+    /** CIE xy -> sRGB hex (inverse of hexToXY, brightness-normalized). Used for scene capture. */
+    fun xyToHex(x: Double, y: Double): String {
+        if (y <= 0.0) return "#FFFFFF"
+        val yy = 1.0
+        val xx = (yy / y) * x
+        val zz = (yy / y) * (1.0 - x - y)
+        var r = xx * 3.2406 + yy * -1.5372 + zz * -0.4986
+        var g = xx * -0.9689 + yy * 1.8758 + zz * 0.0415
+        var b = xx * 0.0557 + yy * -0.2040 + zz * 1.0570
+        val max = maxOf(r, g, b)
+        if (max > 0) { r /= max; g /= max; b /= max }
+        fun deGamma(c: Double): Double {
+            val v = c.coerceIn(0.0, 1.0)
+            return if (v <= 0.0031308) 12.92 * v else 1.055 * Math.pow(v, 1.0 / 2.4) - 0.055
+        }
+        fun hex(c: Double) = String.format("%02X", (deGamma(c) * 255).toInt().coerceIn(0, 255))
+        return "#" + hex(r) + hex(g) + hex(b)
     }
 }

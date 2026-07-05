@@ -73,8 +73,10 @@ object RoutineEngine {
             "play_uri" -> {
                 val uri = a.params["uri"].orEmpty()
                 if (uri.isBlank()) Result.failure(IllegalArgumentException("Sonos: keine Sound-URL gesetzt"))
-                else SonosClient.playUri(a.deviceId, uri, a.params["volume"]?.toIntOrNull())
+                else SonosClient.playUri(a.deviceId, uri, a.params["volume"]?.toIntOrNull(), a.params["meta"].orEmpty())
             }
+            "night_mode" -> SonosClient.setNightMode(a.deviceId, a.params["on"] != "false")
+            "dialog_level" -> SonosClient.setDialogLevel(a.deviceId, a.params["on"] != "false")
             else -> Result.failure(IllegalArgumentException("Sonos: unbekanntes Kommando ${a.command}"))
         }
 
