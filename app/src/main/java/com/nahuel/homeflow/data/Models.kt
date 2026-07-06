@@ -6,7 +6,7 @@ import java.util.UUID
 
 /** How a routine is started. NFC and widget both end up calling RoutineEngine directly;
  *  DEVICE_STATE is watched by the foreground TriggerService via the Hue event stream. */
-enum class TriggerType { MANUAL, NFC, DEVICE_STATE }
+enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI }
 
 /** Time condition for a variant. DAY/NIGHT boundaries come from Config. */
 enum class ConditionType { ALWAYS, DAY, NIGHT }
@@ -16,16 +16,19 @@ enum class TargetType { HUE, SONOS, LG_TV }
 data class Trigger(
     val type: TriggerType = TriggerType.MANUAL,
     val hueLightId: String = "",
-    val toState: Boolean = true // fire when light turns on (true) or off (false)
+    val toState: Boolean = true, // fire when light turns on (true) or off (false)
+    val partnerAware: Boolean = true // LEAVE_WIFI: skip if partner device recently seen at home
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("type", type.name).put("hueLightId", hueLightId).put("toState", toState)
+        .put("partnerAware", partnerAware)
 
     companion object {
         fun fromJson(o: JSONObject) = Trigger(
             type = runCatching { TriggerType.valueOf(o.optString("type", "MANUAL")) }.getOrDefault(TriggerType.MANUAL),
             hueLightId = o.optString("hueLightId", ""),
-            toState = o.optBoolean("toState", true)
+            toState = o.optBoolean("toState", true),
+            partnerAware = o.optBoolean("partnerAware", true)
         )
     }
 }
@@ -130,7 +133,8 @@ data class Config(
     val biasEnabled: Boolean = false,
     val biasTv: String = "",
     val biasLights: List<String> = emptyList(),
-    val lightOrder: List<String> = emptyList()   // custom drag&drop order of Hue lights
+    val lightOrder: List<String> = emptyList(),  // custom drag&drop order of Hue lights
+    val partnerIp: String = ""                   // partner phone IP for presence check
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -148,6 +152,7 @@ data class Config(
         put("biasEnabled", biasEnabled); put("biasTv", biasTv)
         put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
         put("lightOrder", JSONArray().also { a -> lightOrder.forEach { a.put(it) } })
+        put("partnerIp", partnerIp)
     }
 
     companion object {
@@ -182,7 +187,8 @@ data class Config(
                 } ?: emptyList(),
                 lightOrder = o.optJSONArray("lightOrder")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }
-                } ?: emptyList()
+                } ?: emptyList(),
+                partnerIp = o.optString("partnerIp", "")
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.nahuel.homeflow.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,7 @@ fun GradientCard(modifier: Modifier = Modifier, content: @Composable ColumnScope
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(CardGradient)
+            .animateContentSize(tween(200))
             .padding(16.dp),
         content = content
     )

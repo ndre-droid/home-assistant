@@ -3,6 +3,11 @@ package com.nahuel.homeflow.engine
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import java.net.InetAddress
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -25,6 +30,10 @@ class TriggerService : Service() {
     private var eventSource: EventSource? = null
     private var watcher: Job? = null
     private var biasWatcher: Job? = null
+    private var partnerWatcher: Job? = null
+    private var netCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile private var wifiConnected = false
+    @Volatile private var partnerLastSeen = 0L
 
     companion object {
         const val CHANNEL_ID = "homeflow_trigger"
@@ -32,10 +41,13 @@ class TriggerService : Service() {
         fun hasStateTriggers(): Boolean =
             Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.DEVICE_STATE }
 
+        fun hasWifiTriggers(): Boolean =
+            Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.LEAVE_WIFI }
+
         /** Starts or stops the service depending on whether any background work exists. */
         fun sync(ctx: Context) {
             val intent = Intent(ctx, TriggerService::class.java)
-            val needed = hasStateTriggers() || Store.config.value.biasEnabled
+            val needed = hasStateTriggers() || hasWifiTriggers() || Store.config.value.biasEnabled
             if (needed && Store.config.value.hueBridgeIp.isNotEmpty()) {
                 if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(intent) else ctx.startService(intent)
             } else {
@@ -55,7 +67,51 @@ class TriggerService : Service() {
         startInForeground()
         if (watcher == null) watcher = scope.launch { connectLoop() }
         if (biasWatcher == null) biasWatcher = scope.launch { biasLoop() }
+        if (partnerWatcher == null) partnerWatcher = scope.launch { partnerLoop() }
+        if (netCallback == null) registerWifiWatch()
         return START_STICKY
+    }
+
+    // ---------- "Leave home" trigger: WiFi lost = left the flat ----------
+
+    private fun registerWifiWatch() {
+        val cm = getSystemService(ConnectivityManager::class.java)
+        val req = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
+        netCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { wifiConnected = true }
+            override fun onLost(network: Network) {
+                if (wifiConnected) { wifiConnected = false; onWifiLeft() }
+            }
+        }
+        runCatching { cm.registerNetworkCallback(req, netCallback!!) }
+    }
+
+    private fun onWifiLeft() {
+        val partnerConfigured = Store.config.value.partnerIp.isNotBlank()
+        val partnerHome = partnerConfigured &&
+                System.currentTimeMillis() - partnerLastSeen < 20 * 60_000
+        Store.routines.value
+            .filter { it.enabled && it.trigger.type == TriggerType.LEAVE_WIFI }
+            .forEach { r ->
+                if (r.trigger.partnerAware && partnerHome) return@forEach // partner still home
+                RoutineEngine.runAsync(this, r)
+            }
+    }
+
+    /** Pings the partner phone while on WiFi; remembers when it was last seen. */
+    private suspend fun partnerLoop() {
+        while (true) {
+            val ip = Store.config.value.partnerIp
+            if (wifiConnected && ip.isNotBlank()) {
+                runCatching {
+                    if (InetAddress.getByName(ip).isReachable(2500)) {
+                        partnerLastSeen = System.currentTimeMillis()
+                    }
+                }
+            }
+            delay(60_000)
+        }
     }
 
     // ---------- TV bias lighting (content-type mood, no sync box) ----------
@@ -153,7 +209,10 @@ class TriggerService : Service() {
 
     override fun onDestroy() {
         eventSource?.cancel()
-        scope.cancel()   // beendet auch den Bias-Loop
+        netCallback?.let {
+            runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) }
+        }
+        scope.cancel()   // beendet Bias- und Partner-Loop
         super.onDestroy()
     }
 }

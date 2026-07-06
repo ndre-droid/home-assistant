@@ -113,4 +113,5 @@ fun triggerLabel(t: TriggerType): String = when (t) {
     TriggerType.MANUAL -> "Manuell · Button/Widget"
     TriggerType.NFC -> "NFC-Tag"
     TriggerType.DEVICE_STATE -> "Geräte-Trigger (Hue)"
+    TriggerType.LEAVE_WIFI -> "Beim Verlassen des WLANs"
 }

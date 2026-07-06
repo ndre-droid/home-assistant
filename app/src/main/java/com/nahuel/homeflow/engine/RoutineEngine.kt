@@ -66,13 +66,16 @@ object RoutineEngine {
         )
 
         TargetType.SONOS -> when (a.command) {
-            "play" -> SonosClient.play(a.deviceId)
+            "play" ->
+                if (a.params["onlyIfIdle"] == "true" && SonosClient.isPlaying(a.deviceId)) Result.success(Unit)
+                else SonosClient.play(a.deviceId)
             "pause" -> SonosClient.pause(a.deviceId)
             "stop" -> SonosClient.stop(a.deviceId)
             "volume" -> SonosClient.setVolume(a.deviceId, a.params["volume"]?.toIntOrNull() ?: 20)
             "play_uri" -> {
                 val uri = a.params["uri"].orEmpty()
                 if (uri.isBlank()) Result.failure(IllegalArgumentException("Sonos: keine Sound-URL gesetzt"))
+                else if (a.params["onlyIfIdle"] == "true" && SonosClient.isPlaying(a.deviceId)) Result.success(Unit)
                 else SonosClient.playUri(a.deviceId, uri, a.params["volume"]?.toIntOrNull(), a.params["meta"].orEmpty())
             }
             "mute" -> SonosClient.setMute(a.deviceId, a.params["on"] != "false")

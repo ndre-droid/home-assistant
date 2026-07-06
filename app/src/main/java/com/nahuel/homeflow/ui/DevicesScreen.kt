@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -234,6 +235,7 @@ private fun LightRow(light: HueLight) {
     val scope = rememberCoroutineScope()
     var on by remember(light.id, light.on) { mutableStateOf(light.on) }
     var brightness by remember(light.id) { mutableStateOf(light.brightness.toFloat()) }
+    var showWheel by remember { mutableStateOf(false) }
 
     Column(Modifier.padding(vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -259,7 +261,7 @@ private fun LightRow(light: HueLight) {
                 colors = SliderDefaults.colors(thumbColor = Violet, activeTrackColor = Violet)
             )
             if (light.supportsColor) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     colorPresets.forEach { (hex, c) ->
                         Box(
                             Modifier.size(26.dp).clip(CircleShape).background(c)
@@ -270,7 +272,24 @@ private fun LightRow(light: HueLight) {
                                 }
                         )
                     }
+                    Box(
+                        Modifier.size(26.dp).clip(CircleShape)
+                            .background(Brush.sweepGradient(listOf(
+                                Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                Color.Blue, Color.Magenta, Color.Red
+                            )))
+                            .clickable { showWheel = true }
+                    )
                 }
+            }
+            if (showWheel) {
+                ColorWheelDialog(
+                    initialHex = light.colorHex,
+                    onDismiss = { showWheel = false },
+                    onPick = { hex ->
+                        scope.launch { HueClient.setLight(light.id, on = null, brightness = null, colorHex = hex) }
+                    }
+                )
             }
         }
     }

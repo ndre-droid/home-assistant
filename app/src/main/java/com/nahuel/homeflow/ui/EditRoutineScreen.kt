@@ -136,6 +136,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                                 TriggerType.MANUAL -> "Button"
                                 TriggerType.NFC -> "NFC"
                                 TriggerType.DEVICE_STATE -> "Hue-Licht"
+                                TriggerType.LEAVE_WIFI -> "WLAN weg"
                             })
                         }
                     )
@@ -158,6 +159,16 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                         onClick = { save(); onRequestNfcWrite(draftId) },
                         colors = ButtonDefaults.buttonColors(containerColor = Surface2)
                     ) { Text("NFC-Tag beschreiben", color = TextPrim) }
+                }
+                TriggerType.LEAVE_WIFI -> {
+                    Spacer(Modifier.height(8.dp))
+                    FilterChip(
+                        selected = trigger.partnerAware,
+                        onClick = { trigger = trigger.copy(partnerAware = !trigger.partnerAware) },
+                        label = { Text("Nur wenn Partnerin nicht zuhause") }
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Damit die Geräte dann noch erreichbar sind, muss Tailscale-VPN aktiv sein. Partnerin-Erkennung: iPhone-IP in den Einstellungen eintragen.")
                 }
                 else -> {}
             }
@@ -321,6 +332,8 @@ private fun ActionDialog(
     var brightness by remember { mutableStateOf(initial?.params?.get("brightness") ?: "") }
     var volume by remember { mutableStateOf(initial?.params?.get("volume") ?: "") }
     var uri by remember { mutableStateOf(initial?.params?.get("uri") ?: "") }
+    var onlyIfIdle by remember { mutableStateOf(initial?.params?.get("onlyIfIdle") == "true") }
+    var showWheel by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -400,6 +413,7 @@ private fun ActionDialog(
                                 )
                             }
                         }
+                        TextButton(onClick = { showWheel = true }) { Text("🎨 Farbrad öffnen", color = Violet) }
                         if (color.isNotEmpty()) Text("Farbe: $color", color = TextSec, fontSize = 12.sp)
                         OutlinedTextField(value = brightness, onValueChange = { brightness = it },
                             label = { Text("Helligkeit 1–100 (leer = unverändert)") }, singleLine = true)
@@ -426,6 +440,13 @@ private fun ActionDialog(
                                 FilterChip(selected = onState != "false", onClick = { onState = "true" }, label = { Text("Ein") })
                                 FilterChip(selected = onState == "false", onClick = { onState = "false" }, label = { Text("Aus") })
                             }
+                        }
+                        if (command == "play" || command == "play_uri") {
+                            FilterChip(
+                                selected = onlyIfIdle,
+                                onClick = { onlyIfIdle = !onlyIfIdle },
+                                label = { Text("Nur wenn gerade nichts läuft") }
+                            )
                         }
                         if (command == "volume" || command == "play_uri") {
                             OutlinedTextField(value = volume, onValueChange = { volume = it },
@@ -463,6 +484,7 @@ private fun ActionDialog(
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                         if (command == "play_uri") params["uri"] = uri.trim()
+                        if ((command == "play" || command == "play_uri") && onlyIfIdle) params["onlyIfIdle"] = "true"
                         if (command == "mute" || command == "night_mode" || command == "dialog_level")
                             params["on"] = if (onState == "false") "false" else "true"
                     }
@@ -474,4 +496,12 @@ private fun ActionDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
     )
+
+    if (showWheel) {
+        ColorWheelDialog(
+            initialHex = color.ifEmpty { null },
+            onDismiss = { showWheel = false },
+            onPick = { color = it }
+        )
+    }
 }
