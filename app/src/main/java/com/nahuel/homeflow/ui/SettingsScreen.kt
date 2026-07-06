@@ -153,7 +153,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
             Spacer(Modifier.height(4.dp))
-            HintText("Für den Auslöser „WLAN verlassen": Die Routine wird übersprungen, wenn dieses Gerät in den letzten 20 Min im WLAN gesehen wurde. IP im Router fest vergeben (DHCP-Reservierung) und am iPhone „Private WLAN-Adresse" für dein Netz ausschalten, sonst wechselt die Adresse. iPhones schlafen nachts — die Erkennung ist gut, aber nicht 100 %.")
+            HintText("Für den Auslöser „WLAN verlassen“: Die Routine wird übersprungen, wenn dieses Gerät in den letzten 20 Min im WLAN gesehen wurde. IP im Router fest vergeben (DHCP-Reservierung) und am iPhone die private WLAN-Adresse für dein Netz ausschalten, sonst wechselt die Adresse. iPhones schlafen — die Erkennung ist gut, aber nicht 100 %.")
         }
 
         GradientCard {
