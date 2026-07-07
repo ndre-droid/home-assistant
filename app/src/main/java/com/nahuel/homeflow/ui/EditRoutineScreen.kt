@@ -36,7 +36,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     var draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var enabled by remember { mutableStateOf(existing?.enabled ?: true) }
-    var trigger by remember { mutableStateOf(existing?.trigger ?: Trigger()) }
+    var triggers by remember { mutableStateOf(existing?.triggers ?: listOf(Trigger())) }
     var branches by remember { mutableStateOf(existing?.variants ?: listOf(Variant())) }
 
     var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
@@ -49,7 +49,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     }
 
     fun save(): Routine {
-        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, listOf(trigger), branches)
+        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, triggers, branches)
         Store.saveRoutine(r)
         TriggerService.sync(ctx)
         return r
@@ -87,52 +87,70 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         }
 
         GradientCard {
-            SectionTitle("Auslöser")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TriggerType.entries.forEach { t ->
-                    FilterChip(
-                        selected = trigger.type == t,
-                        onClick = { trigger = trigger.copy(type = t) },
-                        label = {
-                            Text(when (t) {
-                                TriggerType.MANUAL -> "Button"
-                                TriggerType.NFC -> "NFC"
-                                TriggerType.DEVICE_STATE -> "Hue-Licht"
-                                TriggerType.LEAVE_WIFI -> "WLAN weg"
-                            })
-                        }
-                    )
+            SectionTitle("Auslöser  ·  einer davon genügt")
+            triggers.forEachIndexed { ti, trg ->
+                if (ti > 0) Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auslöser ${ti + 1}", color = TextSec, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    if (triggers.size > 1) IconButton(
+                        onClick = { triggers = triggers.filterIndexed { k, _ -> k != ti } },
+                        modifier = Modifier.size(28.dp)
+                    ) { Icon(Icons.Filled.Delete, "Auslöser entfernen", tint = TextSec) }
                 }
-            }
-            when (trigger.type) {
-                TriggerType.DEVICE_STATE -> {
-                    Spacer(Modifier.height(8.dp))
-                    LightPicker(hueLights, trigger.hueLightId) { trigger = trigger.copy(hueLightId = it) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = trigger.toState, onClick = { trigger = trigger.copy(toState = true) },
-                            label = { Text("wird eingeschaltet") })
-                        FilterChip(selected = !trigger.toState, onClick = { trigger = trigger.copy(toState = false) },
-                            label = { Text("wird ausgeschaltet") })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TriggerType.entries.forEach { t ->
+                        FilterChip(
+                            selected = trg.type == t,
+                            onClick = { triggers = triggers.mapIndexed { k, x -> if (k == ti) x.copy(type = t) else x } },
+                            label = {
+                                Text(when (t) {
+                                    TriggerType.MANUAL -> "Button"
+                                    TriggerType.NFC -> "NFC"
+                                    TriggerType.DEVICE_STATE -> "Hue-Licht"
+                                    TriggerType.LEAVE_WIFI -> "WLAN weg"
+                                })
+                            }
+                        )
                     }
                 }
-                TriggerType.NFC -> {
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { save(); onRequestNfcWrite(draftId) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Surface2)
-                    ) { Text("NFC-Tag beschreiben", color = TextPrim) }
+                fun upd(block: (Trigger) -> Trigger) {
+                    triggers = triggers.mapIndexed { k, x -> if (k == ti) block(x) else x }
                 }
-                TriggerType.LEAVE_WIFI -> {
-                    Spacer(Modifier.height(8.dp))
-                    FilterChip(
-                        selected = trigger.partnerAware,
-                        onClick = { trigger = trigger.copy(partnerAware = !trigger.partnerAware) },
-                        label = { Text("Nur wenn Partnerin nicht zuhause") }
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
+                when (trg.type) {
+                    TriggerType.DEVICE_STATE -> {
+                        Spacer(Modifier.height(8.dp))
+                        LightPicker(hueLights, trg.hueLightId) { picked -> upd { it.copy(hueLightId = picked) } }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = trg.toState, onClick = { upd { it.copy(toState = true) } },
+                                label = { Text("wird eingeschaltet") })
+                            FilterChip(selected = !trg.toState, onClick = { upd { it.copy(toState = false) } },
+                                label = { Text("wird ausgeschaltet") })
+                        }
+                    }
+                    TriggerType.NFC -> {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { save(); onRequestNfcWrite(draftId) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2)
+                        ) { Text("NFC-Tag beschreiben", color = TextPrim) }
+                    }
+                    TriggerType.LEAVE_WIFI -> {
+                        Spacer(Modifier.height(8.dp))
+                        FilterChip(
+                            selected = trg.partnerAware,
+                            onClick = { upd { it.copy(partnerAware = !it.partnerAware) } },
+                            label = { Text("Nur wenn Partnerin nicht zuhause") }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
+                    }
+                    else -> {}
                 }
-                else -> {}
+                if (ti < triggers.lastIndex) HorizontalDivider(color = Hairline, modifier = Modifier.padding(top = 10.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = { triggers = triggers + Trigger() }, contentPadding = PaddingValues(0.dp)) {
+                Text("+ Auslöser hinzufügen", color = Blue, fontSize = 13.sp)
             }
         }
 

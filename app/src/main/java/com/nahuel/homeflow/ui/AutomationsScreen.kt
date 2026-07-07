@@ -56,7 +56,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                         Column(Modifier.weight(1f)) {
                             Text(r.name, color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(2.dp))
-                            Text(triggerLabel(r.trigger.type), color = TextSec, fontSize = 12.sp)
+                            Text(r.triggers.joinToString(" · ") { triggerLabel(it.type) }, color = TextSec, fontSize = 12.sp)
                         }
                         // Run now — works regardless of enabled state
                         IconButton(onClick = { RoutineEngine.runAsync(ctx, r) }) {
