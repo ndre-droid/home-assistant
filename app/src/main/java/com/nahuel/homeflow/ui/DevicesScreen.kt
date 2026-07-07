@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -60,7 +61,7 @@ private fun CollapsibleSection(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
-    var expanded by rememberSaveable(key) { mutableStateOf(true) }
+    var expanded by rememberSaveable(key) { mutableStateOf(false) }
     GradientCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -123,6 +124,19 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
         HueSection(config, lights, onStatus = { status = it }, onRefresh = { refreshLights() })
         SonosSection(config, onStatus = { status = it })
         TvSection(config, onStatus = { status = it })
+
+        // Placeholder for future smart-home integrations (Shelly, Matter, etc.)
+        GradientCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Add, contentDescription = null, tint = TextSec)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Weitere Geräte", color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text("Matter, Shelly, Zigbee & mehr – in Vorbereitung", color = TextSec, fontSize = 12.sp)
+                }
+                AssistChip(onClick = {}, enabled = false, label = { Text("Bald") })
+            }
+        }
         Spacer(Modifier.height(24.dp))
     }
 }

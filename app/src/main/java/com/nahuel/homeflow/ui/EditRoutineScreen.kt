@@ -14,6 +14,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +38,7 @@ import java.util.UUID
 @Composable
 fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite: (String) -> Unit) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val existing = remember(routineId) { routineId?.takeIf { it.isNotEmpty() }?.let { Store.routine(it) } }
 
     var draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
@@ -44,6 +51,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     var actionDialog by remember { mutableStateOf<Pair<Int, Action?>?>(null) }
     var condDialogFor by remember { mutableStateOf<Int?>(null) }
     var actionClipboard by remember { mutableStateOf<List<Action>>(emptyList()) }
+    var justSaved by remember { mutableStateOf(false) }
+    val savedScale by animateFloatAsState(if (justSaved) 1.05f else 1f, label = "savedScale")
 
     LaunchedEffect(Unit) {
         if (Store.config.value.hueAppKey.isNotEmpty())
@@ -291,10 +300,22 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { save(); onClose() },
-                colors = ButtonDefaults.buttonColors(containerColor = Violet),
-                modifier = Modifier.weight(1f)
-            ) { Text("Speichern") }
+                onClick = {
+                    save()
+                    justSaved = true
+                    scope.launch { kotlinx.coroutines.delay(650); onClose() }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (justSaved) Green else Violet
+                ),
+                modifier = Modifier.weight(1f).graphicsLayer { scaleX = savedScale; scaleY = savedScale }
+            ) {
+                AnimatedContent(targetState = justSaved, label = "saveLabel") { saved ->
+                    if (saved) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Check, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Gespeichert")
+                    } else Text("Speichern")
+                }
+            }
             OutlinedButton(
                 onClick = { RoutineEngine.runAsync(ctx, save()) },
                 modifier = Modifier.weight(1f)
