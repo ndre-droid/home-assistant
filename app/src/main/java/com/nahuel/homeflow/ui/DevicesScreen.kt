@@ -337,17 +337,20 @@ private fun SonosSection(config: Config, onStatus: (String) -> Unit) {
         }
     ) {
         if (config.sonos.isEmpty()) HintText("Tippe auf „Suchen\", um Beam & Era 100 zu finden.")
-        config.sonos.forEach { sp -> SonosRow(sp, onStatus) }
+        config.sonos.forEachIndexed { i, sp -> SonosRow(sp, i, config.sonos.size, onStatus) }
     }
 }
 
 @Composable
-private fun SonosRow(sp: SonosSpeaker, onStatus: (String) -> Unit) {
+private fun SonosRow(sp: SonosSpeaker, index: Int, total: Int, onStatus: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var volume by remember(sp.ip) { mutableStateOf(25f) }
 
     Column(Modifier.padding(vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            ReorderArrows(index, total) { from, to ->
+                Store.updateConfig { it.copy(sonos = it.sonos.moveItem(from, to)) }
+            }
             Text(sp.name, color = TextPrim, modifier = Modifier.weight(1f))
             TextButton(onClick = {
                 scope.launch {
@@ -395,8 +398,11 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
     var mac by remember { mutableStateOf("") }
 
     CollapsibleSection(key = "tv", title = "LG TV") {
-        config.tvs.forEach { tv ->
+        config.tvs.forEachIndexed { ti, tv ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
+                ReorderArrows(ti, config.tvs.size) { from, to ->
+                    Store.updateConfig { it.copy(tvs = it.tvs.moveItem(from, to)) }
+                }
                 Column(Modifier.weight(1f)) {
                     Text(tv.name, color = TextPrim)
                     Text(
@@ -458,4 +464,25 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = Violet)
         ) { Text("TV hinzufügen") }
     }
+}
+
+
+/** Compact up/down reorder controls for a list item. */
+@Composable
+private fun ReorderArrows(index: Int, total: Int, onMove: (from: Int, to: Int) -> Unit) {
+    Column {
+        IconButton(
+            onClick = { if (index > 0) onMove(index, index - 1) },
+            enabled = index > 0, modifier = Modifier.size(22.dp)
+        ) { Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = if (index > 0) TextSec else Hairline) }
+        IconButton(
+            onClick = { if (index < total - 1) onMove(index, index + 1) },
+            enabled = index < total - 1, modifier = Modifier.size(22.dp)
+        ) { Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = if (index < total - 1) TextSec else Hairline) }
+    }
+}
+
+private fun <T> List<T>.moveItem(from: Int, to: Int): List<T> {
+    if (from == to || from !in indices || to !in indices) return this
+    val m = toMutableList(); val item = m.removeAt(from); m.add(to, item); return m
 }

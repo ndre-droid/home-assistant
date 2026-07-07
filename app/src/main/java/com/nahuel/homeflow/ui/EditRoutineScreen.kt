@@ -3,6 +3,8 @@ package com.nahuel.homeflow.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -458,7 +460,11 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
     val cfg = Store.config.value
     return when (a.target) {
         TargetType.HUE -> {
-            val dev = if (a.deviceId == "all") "Alle Lampen" else lights.firstOrNull { it.id == a.deviceId }?.name ?: "Lampe"
+            val dev = if (a.deviceId == "all") {
+                val ex = a.params["exclude"]?.split(",")?.filter { it.isNotEmpty() }.orEmpty()
+                if (ex.isEmpty()) "Alle Lampen"
+                else "Alle Lampen (außer ${ex.mapNotNull { id -> lights.firstOrNull { it.id == id }?.name }.joinToString(", ")})"
+            } else lights.firstOrNull { it.id == a.deviceId }?.name ?: "Lampe"
             val parts = mutableListOf<String>()
             a.params["on"]?.let { parts += if (it == "true") "an" else "aus" }
             a.params["color"]?.let { parts += it }
@@ -496,6 +502,7 @@ private val presetColors = listOf(
     "#FFFFFF", "#FFB74D", "#F062A6", "#34D399", "#3D8BFD", "#8B7CF7", "#EF4444", "#22D3EE"
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ActionDialog(
     initial: Action?,
@@ -510,6 +517,7 @@ private fun ActionDialog(
     var onState by remember { mutableStateOf(initial?.params?.get("on") ?: "") }
     var color by remember { mutableStateOf(initial?.params?.get("color") ?: "") }
     var brightness by remember { mutableStateOf(initial?.params?.get("brightness") ?: "") }
+    var excluded by remember { mutableStateOf(initial?.params?.get("exclude")?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()) }
     var volume by remember { mutableStateOf(initial?.params?.get("volume") ?: "") }
     var uri by remember { mutableStateOf(initial?.params?.get("uri") ?: "") }
     var appId by remember { mutableStateOf(initial?.params?.get("appId") ?: "netflix") }
@@ -602,6 +610,19 @@ private fun ActionDialog(
                         if (color.isNotEmpty()) Text("Farbe: $color", color = TextSec, fontSize = 12.sp)
                         OutlinedTextField(value = brightness, onValueChange = { brightness = it },
                             label = { Text("Helligkeit 1–100 (leer = unverändert)") }, singleLine = true)
+                        if (deviceId == "all" && hueLights.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("Ausnehmen (bleiben unverändert):", color = TextSec, fontSize = 12.sp)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                hueLights.forEach { l ->
+                                    FilterChip(
+                                        selected = l.id in excluded,
+                                        onClick = { excluded = if (l.id in excluded) excluded - l.id else excluded + l.id },
+                                        label = { Text(l.name, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
                     }
                     TargetType.SONOS -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -688,6 +709,7 @@ private fun ActionDialog(
                         if (onState.isNotEmpty()) params["on"] = onState
                         if (color.isNotEmpty()) params["color"] = color
                         brightness.toIntOrNull()?.let { params["brightness"] = it.coerceIn(1, 100).toString() }
+                        if (deviceId == "all" && excluded.isNotEmpty()) params["exclude"] = excluded.joinToString(",")
                     }
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }

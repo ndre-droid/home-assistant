@@ -68,10 +68,11 @@ object HueClient {
     }
 
     /** Any of the params may be null = leave unchanged. deviceId "all" fans out to every light. */
-    suspend fun setLight(id: String, on: Boolean?, brightness: Int?, colorHex: String?): Result<Unit> =
+    suspend fun setLight(id: String, on: Boolean?, brightness: Int?, colorHex: String?, exclude: List<String> = emptyList()): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val targets = if (id == "all") lights().getOrThrow().map { it.id } else listOf(id)
+                val targets = (if (id == "all") lights().getOrThrow().map { it.id } else listOf(id))
+                    .filter { it !in exclude }
                 val body = JSONObject().apply {
                     on?.let { put("on", JSONObject().put("on", it)) }
                     brightness?.let {

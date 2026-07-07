@@ -53,14 +53,9 @@ object RoutineEngine {
     suspend fun run(routine: Routine): List<String> {
         val variant = pickVariant(routine) ?: return listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
         val errors = mutableListOf<String>()
-        supervisorScope {
-            variant.actions.map { action ->
-                async {
-                    execute(action).onFailure {
-                        synchronized(errors) { errors += (it.message ?: "Unbekannter Fehler") }
-                    }
-                }
-            }.awaitAll()
+        // Sequential: each action finishes before the next, so off-then-on works.
+        for (action in variant.actions) {
+            execute(action).onFailure { errors += (it.message ?: "Unbekannter Fehler") }
         }
         return errors
     }
@@ -81,7 +76,8 @@ object RoutineEngine {
             id = a.deviceId,
             on = a.params["on"]?.toBooleanStrictOrNull(),
             brightness = a.params["brightness"]?.toIntOrNull(),
-            colorHex = a.params["color"]?.takeIf { it.startsWith("#") && it.length == 7 }
+            colorHex = a.params["color"]?.takeIf { it.startsWith("#") && it.length == 7 },
+            exclude = a.params["exclude"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
         )
 
         TargetType.SONOS -> when (a.command) {
