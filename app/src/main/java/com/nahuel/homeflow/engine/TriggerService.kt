@@ -44,10 +44,10 @@ class TriggerService : Service() {
             System.currentTimeMillis() - partnerLastSeen < 20 * 60_000L
 
         fun hasStateTriggers(): Boolean =
-            Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.DEVICE_STATE }
+            Store.routines.value.any { it.enabled && it.triggers.any { t -> t.type == TriggerType.DEVICE_STATE } }
 
         fun hasWifiTriggers(): Boolean =
-            Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.LEAVE_WIFI }
+            Store.routines.value.any { it.enabled && it.triggers.any { t -> t.type == TriggerType.LEAVE_WIFI } }
 
         /** Starts or stops the service depending on whether any background work exists. */
         fun sync(ctx: Context) {
@@ -86,20 +86,26 @@ class TriggerService : Service() {
         netCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { wifiConnected = true }
             override fun onLost(network: Network) {
-                if (wifiConnected) { wifiConnected = false; onWifiLeft() }
+                // Debounce flaky wifi: wait, then only fire if STILL disconnected.
+                if (!wifiConnected) return
+                wifiConnected = false
+                scope.launch {
+                    kotlinx.coroutines.delay(8000)          // grace period for brief dropouts
+                    if (!wifiConnected) runCatching { onWifiLeft() }
+                }
             }
         }
         runCatching { cm.registerNetworkCallback(req, netCallback!!) }
     }
 
     private fun onWifiLeft() {
-        val partnerConfigured = Store.config.value.partnerIp.isNotBlank()
-        val partnerHome = partnerConfigured && partnerRecentlySeen()
+        val partnerHome = Store.config.value.partnerIp.isNotBlank() && partnerRecentlySeen()
         Store.routines.value
-            .filter { it.enabled && it.trigger.type == TriggerType.LEAVE_WIFI }
+            .filter { r -> r.enabled && r.triggers.any { it.type == TriggerType.LEAVE_WIFI } }
             .forEach { r ->
-                if (r.trigger.partnerAware && partnerHome) return@forEach // partner still home
-                RoutineEngine.runAsync(this, r)
+                val wifiTrig = r.triggers.first { it.type == TriggerType.LEAVE_WIFI }
+                if (wifiTrig.partnerAware && partnerHome) return@forEach // partner still home
+                runCatching { RoutineEngine.runAsync(this, r) }
             }
     }
 
@@ -179,8 +185,9 @@ class TriggerService : Service() {
     private fun onLightEvent(lightId: String, on: Boolean) {
         Store.routines.value
             .filter {
-                it.enabled && it.trigger.type == TriggerType.DEVICE_STATE &&
-                        it.trigger.hueLightId == lightId && it.trigger.toState == on
+                it.enabled && it.triggers.any { t ->
+                    t.type == TriggerType.DEVICE_STATE && t.hueLightId == lightId && t.toState == on
+                }
             }
             .forEach { RoutineEngine.runAsync(this, it) }
     }

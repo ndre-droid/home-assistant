@@ -109,12 +109,15 @@ data class Routine(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "",
     val enabled: Boolean = true,
-    val trigger: Trigger = Trigger(),
+    val triggers: List<Trigger> = listOf(Trigger()),
     val variants: List<Variant> = emptyList()
 ) {
+    /** Backward-compat: first trigger. Old call sites keep working. */
+    val trigger: Trigger get() = triggers.firstOrNull() ?: Trigger()
+
     fun toJson(): JSONObject = JSONObject()
         .put("id", id).put("name", name).put("enabled", enabled)
-        .put("trigger", trigger.toJson())
+        .put("triggers", JSONArray().also { a -> triggers.forEach { a.put(it.toJson()) } })
         .put("variants", JSONArray().also { a -> variants.forEach { a.put(it.toJson()) } })
 
     companion object {
@@ -123,11 +126,16 @@ data class Routine(
             o.optJSONArray("variants")?.let { arr ->
                 for (i in 0 until arr.length()) vars += Variant.fromJson(arr.getJSONObject(i))
             }
+            val trigs = mutableListOf<Trigger>()
+            o.optJSONArray("triggers")?.let { arr ->
+                for (i in 0 until arr.length()) trigs += Trigger.fromJson(arr.getJSONObject(i))
+            } ?: o.optJSONObject("trigger")?.let { trigs += Trigger.fromJson(it) }  // migrate old single trigger
+            if (trigs.isEmpty()) trigs += Trigger()
             return Routine(
                 id = o.optString("id", UUID.randomUUID().toString()),
                 name = o.optString("name", "Unbenannt"),
                 enabled = o.optBoolean("enabled", true),
-                trigger = o.optJSONObject("trigger")?.let { Trigger.fromJson(it) } ?: Trigger(),
+                triggers = trigs,
                 variants = vars
             )
         }
@@ -152,6 +160,7 @@ data class Config(
     val biasLights: List<String> = emptyList(),
     val lightOrder: List<String> = emptyList(),  // custom drag&drop order of Hue lights
     val partnerIp: String = "",                  // partner phone IP for presence check
+    val myPhoneIp: String = "",                  // your phone IP for leave-wifi detection
     val themeMode: ThemeMode = ThemeMode.SYSTEM, // appearance: follow system / light / dark
     val dynamicColor: Boolean = false            // Material You wallpaper colors (Android 12+)
 ) {
@@ -171,7 +180,7 @@ data class Config(
         put("biasEnabled", biasEnabled); put("biasTv", biasTv)
         put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
         put("lightOrder", JSONArray().also { a -> lightOrder.forEach { a.put(it) } })
-        put("partnerIp", partnerIp)
+        put("partnerIp", partnerIp); put("myPhoneIp", myPhoneIp)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor)
     }
 
@@ -209,6 +218,7 @@ data class Config(
                     (0 until arr.length()).map { arr.getString(it) }
                 } ?: emptyList(),
                 partnerIp = o.optString("partnerIp", ""),
+                myPhoneIp = o.optString("myPhoneIp", ""),
                 themeMode = runCatching { ThemeMode.valueOf(o.optString("themeMode", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM),
                 dynamicColor = o.optBoolean("dynamicColor", false)
             )
