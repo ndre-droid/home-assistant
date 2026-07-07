@@ -40,6 +40,46 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Text("Einstellungen", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
 
         GradientCard {
+            SectionTitle("Darstellung")
+            Text("Design", color = TextSec, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                val modes = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Hell", ThemeMode.DARK to "Dunkel")
+                modes.forEachIndexed { i, (mode, label) ->
+                    SegmentedButton(
+                        selected = config.themeMode == mode,
+                        onClick = { Store.updateConfig { it.copy(themeMode = mode) } },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = modes.size),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = Surface2,
+                            activeContentColor = Violet,
+                            inactiveContainerColor = Surface1,
+                            inactiveContentColor = TextSec
+                        )
+                    ) { Text(label) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Dynamische Farben", color = TextPrim, fontSize = 15.sp)
+                    Text(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
+                            "Nutzt die Farben deines Hintergrundbilds (Material You)"
+                        else "Erst ab Android 12 verfügbar – nutzt sonst das App-Design",
+                        color = TextSec, fontSize = 12.sp
+                    )
+                }
+                Switch(
+                    checked = config.dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
+                    enabled = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
+                    onCheckedChange = { v -> Store.updateConfig { it.copy(dynamicColor = v) } },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Violet, uncheckedTrackColor = Surface2)
+                )
+            }
+        }
+
+        GradientCard {
             SectionTitle("Tag / Nacht")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
