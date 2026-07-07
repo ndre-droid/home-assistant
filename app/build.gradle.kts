@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -25,7 +27,7 @@ android {
         if (!b64.exists()) return@runCatching null
         val ks = layout.buildDirectory.file("homeflow.keystore").get().asFile
         ks.parentFile.mkdirs()
-        ks.writeBytes(java.util.Base64.getDecoder().decode(b64.readText().trim()))
+        ks.writeBytes(Base64.getDecoder().decode(b64.readText().trim()))
         ks
     }.getOrNull()
 
