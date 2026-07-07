@@ -53,7 +53,7 @@ object SceneCapture {
         check(actions.isNotEmpty()) { "Keine Geräte ausgewählt oder nichts lesbar" }
         Routine(
             name = name.ifBlank { "Szene" },
-            trigger = Trigger(TriggerType.MANUAL),
+            triggers = listOf(Trigger(TriggerType.MANUAL)),
             variants = listOf(Variant(emptyList(), actions))
         )
     }

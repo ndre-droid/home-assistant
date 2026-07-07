@@ -49,7 +49,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     }
 
     fun save(): Routine {
-        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, trigger, branches)
+        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, listOf(trigger), branches)
         Store.saveRoutine(r)
         TriggerService.sync(ctx)
         return r
