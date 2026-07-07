@@ -9,6 +9,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,38 +26,30 @@ import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.engine.RoutineEngine
 import com.nahuel.homeflow.engine.TriggerService
-import com.nahuel.homeflow.nlp.ClaudeParser
-import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
 fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite: (String) -> Unit) {
     val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
     val existing = remember(routineId) { routineId?.takeIf { it.isNotEmpty() }?.let { Store.routine(it) } }
 
     var draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var enabled by remember { mutableStateOf(existing?.enabled ?: true) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: Trigger()) }
-    var variants by remember { mutableStateOf(existing?.variants ?: listOf(Variant())) }
+    var branches by remember { mutableStateOf(existing?.variants ?: listOf(Variant())) }
 
-    var nlText by remember { mutableStateOf("") }
-    var nlBusy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
     var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
-    var actionDialog by remember { mutableStateOf<Pair<Int, Action?>?>(null) } // variantIndex to action-being-edited
+    var actionDialog by remember { mutableStateOf<Pair<Int, Action?>?>(null) }
+    var condDialogFor by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
-        if (Store.config.value.hueAppKey.isNotEmpty()) HueClient.lights().onSuccess { hueLights = it }
-    }
-
-    fun applyParsed(r: Routine) {
-        draftId = r.id; name = r.name; trigger = r.trigger; variants = r.variants
+        if (Store.config.value.hueAppKey.isNotEmpty())
+            HueClient.lights().onSuccess { hueLights = orderLights(it, Store.config.value.lightOrder) }
     }
 
     fun save(): Routine {
-        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, trigger, variants)
+        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, trigger, branches)
         Store.saveRoutine(r)
         TriggerService.sync(ctx)
         return r
@@ -73,7 +67,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowBack, "Zurück", tint = TextPrim) }
             Text(
                 if (existing == null) "Neue Automation" else "Bearbeiten",
-                color = TextPrim, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                color = TextPrim, fontSize = 20.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f)
             )
             if (existing != null) {
@@ -83,43 +77,11 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             }
         }
 
-        // ---- Natural language via Claude ----
-        GradientCard {
-            SectionTitle(if (existing == null) "Mit Claude erstellen" else "Mit Claude ändern")
-            OutlinedTextField(
-                value = nlText, onValueChange = { nlText = it },
-                placeholder = { Text("z. B. Wenn das Badlicht angeht: tagsüber grün + Vogelgeräusche leise auf Sonos Bad, nachts blau gedimmt + Walgeräusche.") },
-                modifier = Modifier.fillMaxWidth(), minLines = 3
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    nlBusy = true; error = ""
-                    scope.launch {
-                        ClaudeParser.parse(nlText, if (existing == null) null else
-                            Routine(draftId, name, enabled, trigger, variants), hueLights)
-                            .onSuccess { applyParsed(it) }
-                            .onFailure { error = it.message ?: "Fehler" }
-                        nlBusy = false
-                    }
-                },
-                enabled = !nlBusy && nlText.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Violet)
-            ) {
-                if (nlBusy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                else Text("Los")
-            }
-            if (error.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-            }
-        }
-
-        // ---- Manual editing ----
         GradientCard {
             SectionTitle("Name")
             OutlinedTextField(
                 value = name, onValueChange = { name = it },
+                placeholder = { Text("z. B. Badlicht-Sound") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
         }
@@ -168,67 +130,110 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                         label = { Text("Nur wenn Partnerin nicht zuhause") }
                     )
                     Spacer(Modifier.height(4.dp))
-                    HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Damit die Geräte dann noch erreichbar sind, muss Tailscale-VPN aktiv sein. Partnerin-Erkennung: iPhone-IP in den Einstellungen eintragen.")
+                    HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
                 }
                 else -> {}
             }
         }
 
-        variants.forEachIndexed { vi, variant ->
-            GradientCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SectionTitle("Aktionen")
-                    Spacer(Modifier.weight(1f))
-                    if (variants.size > 1) {
-                        IconButton(onClick = { variants = variants.filterIndexed { i, _ -> i != vi } }) {
-                            Icon(Icons.Filled.Delete, "Variante löschen", tint = TextSec)
-                        }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ConditionType.entries.forEach { c ->
-                        FilterChip(
-                            selected = variant.condition == c,
-                            onClick = {
-                                variants = variants.mapIndexed { i, v ->
-                                    if (i == vi) v.copy(condition = c) else v
-                                }
-                            },
-                            label = { Text(when (c) {
-                                ConditionType.ALWAYS -> "Immer"
-                                ConditionType.DAY -> "Tag"
-                                ConditionType.NIGHT -> "Nacht"
-                            }) }
+        // ================= Entscheidungsbaum =================
+        SectionTitle("Ablauf  ·  von oben nach unten, erster passender Zweig gewinnt")
+        branches.forEachIndexed { bi, br ->
+            Row(Modifier.height(IntrinsicSize.Min)) {
+                // Baum-Schiene: Knoten + Linie
+                Column(
+                    Modifier.width(20.dp).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        Modifier.padding(top = 18.dp).size(8.dp).clip(CircleShape)
+                            .background(if (br.conditions.isEmpty()) TextSec else Violet)
+                    )
+                    if (bi < branches.lastIndex) {
+                        Box(
+                            Modifier.padding(top = 4.dp).width(1.dp).weight(1f)
+                                .background(Hairline)
                         )
                     }
                 }
-                Spacer(Modifier.height(6.dp))
-                variant.actions.forEachIndexed { ai, action ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { actionDialog = vi to action }
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(describeAction(action, hueLights), color = TextPrim, fontSize = 14.sp)
-                            if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
-                                Text("⚠ Sound-URL fehlt – antippen und eintragen", color = Pink, fontSize = 12.sp)
+                Spacer(Modifier.width(6.dp))
+                GradientCard(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            branchTitle(bi, br, branches.size),
+                            color = if (br.conditions.isEmpty()) TextSec else Violet,
+                            fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (bi > 0) IconButton(onClick = { branches = branches.swap(bi, bi - 1) }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = TextSec)
+                        }
+                        if (bi < branches.lastIndex) IconButton(onClick = { branches = branches.swap(bi, bi + 1) }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = TextSec)
+                        }
+                        if (branches.size > 1) IconButton(onClick = {
+                            branches = branches.filterIndexed { i, _ -> i != bi }
+                        }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Delete, "Zweig löschen", tint = TextSec)
+                        }
+                    }
+
+                    // Bedingungen
+                    if (br.conditions.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            br.conditions.forEachIndexed { ci, c ->
+                                InputChip(
+                                    selected = true,
+                                    onClick = {
+                                        branches = branches.mapIndexed { i, v ->
+                                            if (i == bi) v.copy(conditions = v.conditions.filterIndexed { j, _ -> j != ci }) else v
+                                        }
+                                    },
+                                    label = { Text(condLabel(c), fontSize = 12.sp) },
+                                    trailingIcon = { Text("×", color = TextSec) }
+                                )
                             }
                         }
-                        IconButton(onClick = {
-                            variants = variants.mapIndexed { i, v ->
-                                if (i == vi) v.copy(actions = v.actions.filterIndexed { j, _ -> j != ai }) else v
+                    }
+                    TextButton(onClick = { condDialogFor = bi }, contentPadding = PaddingValues(0.dp)) {
+                        Text("+ Bedingung", color = Blue, fontSize = 13.sp)
+                    }
+
+                    HorizontalDivider(color = Hairline)
+                    Spacer(Modifier.height(4.dp))
+                    Text("dann:", color = TextSec, fontSize = 12.sp)
+
+                    br.actions.forEachIndexed { ai, action ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { actionDialog = bi to action }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(describeAction(action, hueLights), color = TextPrim, fontSize = 14.sp)
+                                if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
+                                    Text("⚠ Sound-URL fehlt – antippen", color = Pink, fontSize = 12.sp)
+                                }
                             }
-                        }) { Icon(Icons.Filled.Delete, "Aktion löschen", tint = TextSec) }
+                            IconButton(onClick = {
+                                branches = branches.mapIndexed { i, v ->
+                                    if (i == bi) v.copy(actions = v.actions.filterIndexed { j, _ -> j != ai }) else v
+                                }
+                            }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Delete, "Aktion löschen", tint = TextSec)
+                            }
+                        }
+                    }
+                    TextButton(onClick = { actionDialog = bi to null }, contentPadding = PaddingValues(0.dp)) {
+                        Text("+ Aktion", color = Violet, fontSize = 13.sp)
                     }
                 }
-                TextButton(onClick = { actionDialog = vi to null }) { Text("+ Aktion hinzufügen", color = Violet) }
             }
         }
-        TextButton(onClick = { variants = variants + Variant(ConditionType.NIGHT) }) {
-            Text("+ Tag/Nacht-Variante hinzufügen", color = Blue)
+        TextButton(onClick = { branches = branches + Variant() }) {
+            Text("+ Zweig hinzufügen (Sonst wenn … / Sonst)", color = Blue)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,21 +250,109 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         Spacer(Modifier.height(24.dp))
     }
 
-    actionDialog?.let { (vi, editing) ->
+    condDialogFor?.let { bi ->
+        CondDialog(
+            onDismiss = { condDialogFor = null },
+            onConfirm = { c ->
+                branches = branches.mapIndexed { i, v -> if (i == bi) v.copy(conditions = v.conditions + c) else v }
+                condDialogFor = null
+            }
+        )
+    }
+
+    actionDialog?.let { (bi, editing) ->
         ActionDialog(
             initial = editing,
             hueLights = hueLights,
             onDismiss = { actionDialog = null },
             onConfirm = { newAction ->
-                variants = variants.mapIndexed { i, v ->
-                    if (i != vi) v
+                branches = branches.mapIndexed { i, v ->
+                    if (i != bi) v
                     else if (editing == null) v.copy(actions = v.actions + newAction)
-                    else v.copy(actions = v.actions.map { if (it === editing || it == editing) newAction else it })
+                    else v.copy(actions = v.actions.map { if (it == editing) newAction else it })
                 }
                 actionDialog = null
             }
         )
     }
+}
+
+private fun List<Variant>.swap(a: Int, b: Int): List<Variant> {
+    val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m
+}
+
+private fun branchTitle(bi: Int, br: Variant, total: Int): String = when {
+    br.conditions.isNotEmpty() && bi == 0 -> "Wenn"
+    br.conditions.isNotEmpty() -> "Sonst wenn"
+    total == 1 -> "Immer"
+    bi == total - 1 -> "Sonst"
+    else -> "Immer (fängt alles ab – nach unten schieben?)"
+}
+
+fun condLabel(c: Cond): String {
+    val cfg = Store.config.value
+    val sp = cfg.sonos.firstOrNull { it.ip == c.deviceId }?.name ?: c.deviceId
+    return when (c.type) {
+        CondType.DAY -> "Tagsüber"
+        CondType.NIGHT -> "Nachts"
+        CondType.SPEAKER_IDLE -> "$sp: nichts läuft"
+        CondType.SPEAKER_PLAYING -> "$sp: spielt gerade"
+        CondType.PARTNER_HOME -> "Partnerin zuhause"
+        CondType.PARTNER_AWAY -> "Partnerin unterwegs"
+    }
+}
+
+@Composable
+private fun CondDialog(onDismiss: () -> Unit, onConfirm: (Cond) -> Unit) {
+    val cfg = Store.config.value
+    var type by remember { mutableStateOf(CondType.DAY) }
+    var speakerIp by remember { mutableStateOf(cfg.sonos.firstOrNull()?.ip ?: "") }
+    val needsSpeaker = type == CondType.SPEAKER_IDLE || type == CondType.SPEAKER_PLAYING
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface1,
+        title = { Text("Bedingung hinzufügen", color = TextPrim) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    CondType.DAY to "Tagsüber", CondType.NIGHT to "Nachts",
+                    CondType.SPEAKER_IDLE to "Auf Speaker läuft nichts",
+                    CondType.SPEAKER_PLAYING to "Auf Speaker läuft etwas",
+                    CondType.PARTNER_HOME to "Partnerin zuhause",
+                    CondType.PARTNER_AWAY to "Partnerin unterwegs"
+                ).forEach { (t, label) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { type = t }
+                    ) {
+                        RadioButton(selected = type == t, onClick = { type = t },
+                            colors = RadioButtonDefaults.colors(selectedColor = Violet))
+                        Text(label, color = TextPrim, fontSize = 14.sp)
+                    }
+                }
+                if (needsSpeaker) {
+                    var open by remember { mutableStateOf(false) }
+                    val label = cfg.sonos.firstOrNull { it.ip == speakerIp }?.name ?: "Speaker wählen…"
+                    Box {
+                        OutlinedButton(onClick = { open = true }) { Text(label, color = TextPrim) }
+                        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                            cfg.sonos.forEach { s ->
+                                DropdownMenuItem(text = { Text(s.name) },
+                                    onClick = { speakerIp = s.ip; open = false })
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(Cond(type, if (needsSpeaker) speakerIp else ""))
+            }) { Text("Hinzufügen", color = Violet) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
+    )
 }
 
 @Composable
@@ -275,6 +368,13 @@ private fun LightPicker(lights: List<HueLight>, selectedId: String, onSelect: (S
         }
     }
 }
+
+private val tvApps = listOf(
+    "netflix" to "Netflix",
+    "youtube.leanback.v4" to "YouTube",
+    "amazon" to "Prime Video",
+    "com.disney.disneyplus-prod" to "Disney+"
+)
 
 fun describeAction(a: Action, lights: List<HueLight>): String {
     val cfg = Store.config.value
@@ -298,13 +398,15 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
                 "dialog_level" -> "Sprachverbesserung " + (if (a.params["on"] == "false") "aus" else "ein")
                 else -> a.command
             }
-            "🔊 $dev: $label"
+            val idle = if (a.params["onlyIfIdle"] == "true") " · nur wenn frei" else ""
+            "🔊 $dev: $label$idle"
         }
         TargetType.LG_TV -> {
             val dev = cfg.tvs.firstOrNull { it.ip == a.deviceId }?.name ?: a.deviceId
             val label = when (a.command) {
                 "on" -> "einschalten"; "off" -> "ausschalten"; "mute" -> "stumm"
                 "volume" -> "Lautstärke ${a.params["volume"]}"
+                "app" -> (tvApps.firstOrNull { it.first == a.params["appId"] }?.second ?: "App") + " öffnen"
                 else -> a.command
             }
             "📺 $dev: $label"
@@ -327,13 +429,16 @@ private fun ActionDialog(
     var target by remember { mutableStateOf(initial?.target ?: TargetType.HUE) }
     var deviceId by remember { mutableStateOf(initial?.deviceId ?: "all") }
     var command by remember { mutableStateOf(initial?.command ?: "set") }
-    var onState by remember { mutableStateOf(initial?.params?.get("on") ?: "") } // "", "true", "false"
+    var onState by remember { mutableStateOf(initial?.params?.get("on") ?: "") }
     var color by remember { mutableStateOf(initial?.params?.get("color") ?: "") }
     var brightness by remember { mutableStateOf(initial?.params?.get("brightness") ?: "") }
     var volume by remember { mutableStateOf(initial?.params?.get("volume") ?: "") }
     var uri by remember { mutableStateOf(initial?.params?.get("uri") ?: "") }
+    var appId by remember { mutableStateOf(initial?.params?.get("appId") ?: "netflix") }
+    var contentId by remember { mutableStateOf(initial?.params?.get("contentId") ?: "") }
     var onlyIfIdle by remember { mutableStateOf(initial?.params?.get("onlyIfIdle") == "true") }
     var showWheel by remember { mutableStateOf(false) }
+    var showRadio by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -363,7 +468,6 @@ private fun ActionDialog(
                     }
                 }
 
-                // Device picker
                 var devOpen by remember { mutableStateOf(false) }
                 val devLabel = when (target) {
                     TargetType.HUE -> if (deviceId == "all") "Alle Lampen"
@@ -405,15 +509,14 @@ private fun ActionDialog(
                             presetColors.forEach { hex ->
                                 val c = Color(android.graphics.Color.parseColor(hex))
                                 Box(
-                                    Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(c)
+                                    Modifier.size(24.dp).clip(CircleShape).background(c)
                                         .clickable { color = if (color == hex) "" else hex }
                                 )
                             }
                         }
-                        TextButton(onClick = { showWheel = true }) { Text("🎨 Farbrad öffnen", color = Violet) }
+                        TextButton(onClick = { showWheel = true }, contentPadding = PaddingValues(0.dp)) {
+                            Text("🎨 Farbrad öffnen", color = Violet)
+                        }
                         if (color.isNotEmpty()) Text("Farbe: $color", color = TextSec, fontSize = 12.sp)
                         OutlinedTextField(value = brightness, onValueChange = { brightness = it },
                             label = { Text("Helligkeit 1–100 (leer = unverändert)") }, singleLine = true)
@@ -454,19 +557,42 @@ private fun ActionDialog(
                         }
                         if (command == "play_uri") {
                             OutlinedTextField(value = uri, onValueChange = { uri = it },
-                                label = { Text("Audio-URL (MP3/Radio-Stream – keine YouTube-Links)") }, singleLine = true)
+                                label = { Text("Audio-URL (MP3/Stream – kein YouTube)") }, singleLine = true)
+                            TextButton(onClick = { showRadio = true }, contentPadding = PaddingValues(0.dp)) {
+                                Text("🔍 Sounds & Sender suchen", color = Blue)
+                            }
                         }
                     }
                     TargetType.LG_TV -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("on" to "An", "off" to "Aus", "mute" to "Stumm", "volume" to "Lautstärke")
-                                .forEach { (c, l) ->
-                                    FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                                }
+                            listOf("on" to "An", "off" to "Aus", "mute" to "Stumm").forEach { (c, l) ->
+                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("volume" to "Lautstärke", "app" to "App öffnen").forEach { (c, l) ->
+                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
+                            }
                         }
                         if (command == "volume") {
                             OutlinedTextField(value = volume, onValueChange = { volume = it },
                                 label = { Text("Lautstärke 0–100") }, singleLine = true)
+                        }
+                        if (command == "app") {
+                            var appOpen by remember { mutableStateOf(false) }
+                            val appLabel = tvApps.firstOrNull { it.first == appId }?.second ?: "App wählen…"
+                            Box {
+                                OutlinedButton(onClick = { appOpen = true }) { Text(appLabel, color = TextPrim) }
+                                DropdownMenu(expanded = appOpen, onDismissRequest = { appOpen = false }) {
+                                    tvApps.forEach { (id, label) ->
+                                        DropdownMenuItem(text = { Text(label) },
+                                            onClick = { appId = id; appOpen = false })
+                                    }
+                                }
+                            }
+                            OutlinedTextField(value = contentId, onValueChange = { contentId = it },
+                                label = { Text("Optional: YouTube-Link/-ID oder Netflix-Titel-ID") }, singleLine = true)
+                            HintText("Leer = App öffnet normal. Mit YouTube-Link startet direkt das Video.")
                         }
                     }
                 }
@@ -484,11 +610,18 @@ private fun ActionDialog(
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                         if (command == "play_uri") params["uri"] = uri.trim()
-                        if ((command == "play" || command == "play_uri") && onlyIfIdle) params["onlyIfIdle"] = "true"
                         if (command == "mute" || command == "night_mode" || command == "dialog_level")
                             params["on"] = if (onState == "false") "false" else "true"
+                        if ((command == "play" || command == "play_uri") && onlyIfIdle) params["onlyIfIdle"] = "true"
                     }
-                    TargetType.LG_TV -> volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
+                    TargetType.LG_TV -> {
+                        volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
+                        if (command == "app") {
+                            params["appId"] = appId
+                            val cid = extractContentId(appId, contentId.trim())
+                            if (cid.isNotEmpty()) params["contentId"] = cid
+                        }
+                    }
                 }
                 val cmd = if (target == TargetType.HUE) "set" else command
                 onConfirm(Action(target, deviceId, cmd, params))
@@ -504,4 +637,17 @@ private fun ActionDialog(
             onPick = { color = it }
         )
     }
+    if (showRadio) {
+        RadioSearchDialog(onDismiss = { showRadio = false }, onPick = { uri = it })
+    }
+}
+
+/** Pulls the video id out of pasted YouTube links; passes anything else through. */
+private fun extractContentId(appId: String, raw: String): String {
+    if (raw.isEmpty()) return ""
+    if (appId.startsWith("youtube")) {
+        Regex("[?&]v=([A-Za-z0-9_-]{6,})").find(raw)?.let { return it.groupValues[1] }
+        Regex("youtu\\.be/([A-Za-z0-9_-]{6,})").find(raw)?.let { return it.groupValues[1] }
+    }
+    return raw
 }

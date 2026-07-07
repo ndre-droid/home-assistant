@@ -8,8 +8,19 @@ import java.util.UUID
  *  DEVICE_STATE is watched by the foreground TriggerService via the Hue event stream. */
 enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI }
 
-/** Time condition for a variant. DAY/NIGHT boundaries come from Config. */
-enum class ConditionType { ALWAYS, DAY, NIGHT }
+/** A single IF-condition on a branch. All conditions of a branch must match. */
+enum class CondType { DAY, NIGHT, SPEAKER_IDLE, SPEAKER_PLAYING, PARTNER_HOME, PARTNER_AWAY }
+
+data class Cond(val type: CondType, val deviceId: String = "") {
+    fun toJson(): JSONObject = JSONObject().put("type", type.name).put("deviceId", deviceId)
+
+    companion object {
+        fun fromJson(o: JSONObject) = Cond(
+            runCatching { CondType.valueOf(o.optString("type")) }.getOrDefault(CondType.DAY),
+            o.optString("deviceId", "")
+        )
+    }
+}
 
 enum class TargetType { HUE, SONOS, LG_TV }
 
@@ -65,12 +76,13 @@ data class Action(
     }
 }
 
+/** One decision branch: first branch whose conditions ALL match wins (if / else-if / else). */
 data class Variant(
-    val condition: ConditionType = ConditionType.ALWAYS,
+    val conditions: List<Cond> = emptyList(),   // empty = always matches ("Sonst")
     val actions: List<Action> = emptyList()
 ) {
     fun toJson(): JSONObject = JSONObject()
-        .put("condition", condition.name)
+        .put("conditions", JSONArray().also { a -> conditions.forEach { a.put(it.toJson()) } })
         .put("actions", JSONArray().also { a -> actions.forEach { a.put(it.toJson()) } })
 
     companion object {
@@ -79,11 +91,15 @@ data class Variant(
             o.optJSONArray("actions")?.let { arr ->
                 for (i in 0 until arr.length()) acts += Action.fromJson(arr.getJSONObject(i))
             }
-            return Variant(
-                condition = runCatching { ConditionType.valueOf(o.optString("condition", "ALWAYS")) }
-                    .getOrDefault(ConditionType.ALWAYS),
-                actions = acts
-            )
+            val conds = mutableListOf<Cond>()
+            val arr = o.optJSONArray("conditions")
+            if (arr != null) {
+                for (i in 0 until arr.length()) conds += Cond.fromJson(arr.getJSONObject(i))
+            } else when (o.optString("condition")) {   // migrate old routines
+                "DAY" -> conds += Cond(CondType.DAY)
+                "NIGHT" -> conds += Cond(CondType.NIGHT)
+            }
+            return Variant(conditions = conds, actions = acts)
         }
     }
 }

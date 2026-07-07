@@ -16,8 +16,29 @@ android {
         versionName = "1.0"
     }
 
+    // Fixed signing key (decoded from checked-in base64) so every build has the SAME
+    // signature -> Android installs updates in place and user data survives.
+    signingConfigs {
+        create("shared") {
+            val b64 = rootProject.file("app/homeflow.keystore.b64")
+            val ks = layout.buildDirectory.file("homeflow.keystore").get().asFile
+            if (b64.exists()) {
+                ks.parentFile.mkdirs()
+                ks.writeBytes(java.util.Base64.getDecoder().decode(b64.readText().trim()))
+            }
+            storeFile = ks
+            storePassword = "homeflow"
+            keyAlias = "homeflow"
+            keyPassword = "homeflow"
+        }
+    }
+
     buildTypes {
-        release { isMinifyEnabled = false }
+        debug { signingConfig = signingConfigs.getByName("shared") }
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

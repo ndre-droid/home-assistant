@@ -109,6 +109,14 @@ object LgTvClient {
         session(ip, key, "ssap://audio/setMute", JSONObject().put("mute", mute)); Unit
     }
 
+    /** Opens an app on the TV; contentId deep-links into it (YouTube video id, Netflix title id). */
+    suspend fun launchApp(ip: String, key: String, appId: String, contentId: String?): Result<Unit> = runCatching {
+        require(appId.isNotBlank()) { "Keine App gewählt" }
+        val payload = JSONObject().put("id", appId)
+        contentId?.takeIf { it.isNotBlank() }?.let { payload.put("contentId", it) }
+        session(ip, key, "ssap://system.launcher/launch", payload); Unit
+    }
+
     /** Foreground app id (netflix, youtube.leanback.v4, com.webos.app.hdmi2, ...). Fails fast if TV is off. */
     suspend fun getForegroundApp(ip: String, key: String): Result<String> = runCatching {
         val (_, payload) = session(ip, key, "ssap://com.webos.applicationManager/getForegroundAppInfo", null)

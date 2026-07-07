@@ -54,7 +54,7 @@ object SceneCapture {
         Routine(
             name = name.ifBlank { "Szene" },
             trigger = Trigger(TriggerType.MANUAL),
-            variants = listOf(Variant(ConditionType.ALWAYS, actions))
+            variants = listOf(Variant(emptyList(), actions))
         )
     }
 }

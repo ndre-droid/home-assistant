@@ -33,10 +33,15 @@ class TriggerService : Service() {
     private var partnerWatcher: Job? = null
     private var netCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var wifiConnected = false
-    @Volatile private var partnerLastSeen = 0L
 
     companion object {
         const val CHANNEL_ID = "homeflow_trigger"
+
+        @Volatile var partnerLastSeen = 0L
+
+        /** True if the partner phone answered a ping within the last 20 minutes. */
+        fun partnerRecentlySeen(): Boolean =
+            System.currentTimeMillis() - partnerLastSeen < 20 * 60_000L
 
         fun hasStateTriggers(): Boolean =
             Store.routines.value.any { it.enabled && it.trigger.type == TriggerType.DEVICE_STATE }
@@ -89,8 +94,7 @@ class TriggerService : Service() {
 
     private fun onWifiLeft() {
         val partnerConfigured = Store.config.value.partnerIp.isNotBlank()
-        val partnerHome = partnerConfigured &&
-                System.currentTimeMillis() - partnerLastSeen < 20 * 60_000
+        val partnerHome = partnerConfigured && partnerRecentlySeen()
         Store.routines.value
             .filter { it.enabled && it.trigger.type == TriggerType.LEAVE_WIFI }
             .forEach { r ->

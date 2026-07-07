@@ -19,8 +19,9 @@ val Pink = Color(0xFFF062A6)
 val Green = Color(0xFF34D399)
 val TextPrim = Color(0xFFF2F3F7)
 val TextSec = Color(0xFF8A93A6)
+val Hairline = Color(0xFF222836)
 
-val CardGradient = Brush.linearGradient(listOf(Color(0xFF232A3D), Color(0xFF161B26)))
+val CardGradient = Brush.linearGradient(listOf(Color(0xFF1B2130), Color(0xFF151A25)))
 val AccentGradient = Brush.linearGradient(listOf(Violet, Pink))
 
 private val scheme = darkColorScheme(

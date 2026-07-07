@@ -35,15 +35,23 @@ object RoutineEngine {
         }
     }
 
-    /** Picks the variant matching the current time (DAY/NIGHT), falls back to ALWAYS. */
-    fun pickVariant(routine: Routine): Variant? {
-        val wanted = if (Store.isDaytime()) ConditionType.DAY else ConditionType.NIGHT
-        return routine.variants.firstOrNull { it.condition == wanted }
-            ?: routine.variants.firstOrNull { it.condition == ConditionType.ALWAYS }
+    /** Decision tree: branches are checked top-down, first branch whose conditions ALL match wins. */
+    suspend fun pickVariant(routine: Routine): Variant? {
+        for (v in routine.variants) if (v.conditions.all { matches(it) }) return v
+        return null
+    }
+
+    private suspend fun matches(c: Cond): Boolean = when (c.type) {
+        CondType.DAY -> Store.isDaytime()
+        CondType.NIGHT -> !Store.isDaytime()
+        CondType.SPEAKER_IDLE -> !SonosClient.isPlaying(c.deviceId)
+        CondType.SPEAKER_PLAYING -> SonosClient.isPlaying(c.deviceId)
+        CondType.PARTNER_HOME -> TriggerService.partnerRecentlySeen()
+        CondType.PARTNER_AWAY -> !TriggerService.partnerRecentlySeen()
     }
 
     suspend fun run(routine: Routine): List<String> {
-        val variant = pickVariant(routine) ?: return listOf("Keine passende Variante")
+        val variant = pickVariant(routine) ?: return listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
         val errors = mutableListOf<String>()
         supervisorScope {
             variant.actions.map { action ->
@@ -94,6 +102,7 @@ object RoutineEngine {
                     else LgTvClient.powerOn(tv.mac)
                 "volume" -> LgTvClient.setVolume(tv.ip, tv.clientKey, a.params["volume"]?.toIntOrNull() ?: 10)
                 "mute" -> LgTvClient.setMute(tv.ip, tv.clientKey, true)
+                "app" -> LgTvClient.launchApp(tv.ip, tv.clientKey, a.params["appId"].orEmpty(), a.params["contentId"])
                 else -> Result.failure(IllegalArgumentException("TV: unbekanntes Kommando ${a.command}"))
             }
         }

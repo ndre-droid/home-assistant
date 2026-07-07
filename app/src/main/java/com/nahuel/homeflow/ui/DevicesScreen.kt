@@ -65,7 +65,7 @@ private fun CollapsibleSection(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }
         ) {
-            Text(title, color = TextPrim, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            Text(title, color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f).padding(vertical = 6.dp))
             if (expanded) actions()
             Icon(
@@ -101,7 +101,7 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Geräte", color = TextPrim, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+            Text("Geräte", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f))
             Button(
                 onClick = {

@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nahuel.homeflow.ManualActivity
@@ -38,35 +37,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Einstellungen", color = TextPrim, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-
-        GradientCard {
-            SectionTitle("Claude (natürliche Sprache)")
-            OutlinedTextField(
-                value = config.anthropicKey,
-                onValueChange = { v -> Store.updateConfig { it.copy(anthropicKey = v.trim()) } },
-                label = { Text("Anthropic API-Key") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                supportingText = {
-                    when {
-                        config.anthropicKey.isEmpty() -> Text("Key von console.anthropic.com → API Keys", color = TextSec)
-                        !config.anthropicKey.startsWith("sk-ant-") ->
-                            Text("⚠ Sieht nicht wie ein API-Key aus – er beginnt mit sk-ant-…", color = Pink)
-                        else -> Text("Gespeichert ✓ (…${config.anthropicKey.takeLast(4)})", color = Green)
-                    }
-                }
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = config.model,
-                onValueChange = { v -> Store.updateConfig { it.copy(model = v.trim()) } },
-                label = { Text("Modell") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
-            )
-            Spacer(Modifier.height(4.dp))
-            HintText("Wichtig: Key auf console.anthropic.com unter „API Keys\" erstellen (nicht das claude.ai-Login) und Guthaben aufladen. Wird nur beim Erstellen/Ändern von Automationen genutzt.")
-        }
+        Text("Einstellungen", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
 
         GradientCard {
             SectionTitle("Tag / Nacht")

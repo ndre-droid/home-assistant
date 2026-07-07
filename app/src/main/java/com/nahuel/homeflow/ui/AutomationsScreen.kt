@@ -37,7 +37,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             item {
                 Text(
                     "Automationen",
-                    color = TextPrim, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                    color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -46,7 +46,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                     GradientCard {
                         Text("Noch keine Automationen", color = TextPrim, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
-                        HintText("Tippe auf +, beschreibe deine Routine in normaler Sprache und Claude baut sie für dich. Beispiel: „Wenn ich den NFC-Tag berühre: alle Lichter, Sonos und TV aus.“")
+                        HintText("Tippe auf +, um eine Automation mit Auslöser, Bedingungen und Aktionen zu bauen – oder nimm den aktuellen Zustand als Szene auf.")
                     }
                 }
             }
@@ -95,7 +95,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 text = {
                     Column {
                         TextButton(onClick = { showAddChooser.value = false; onEdit("") }) {
-                            Text("Neue Automation (Claude / manuell)", color = Violet)
+                            Text("Neue Automation", color = Violet)
                         }
                         TextButton(onClick = { showAddChooser.value = false; onCaptureScene() }) {
                             Text("Szene aus aktuellem Zustand aufnehmen", color = Blue)
