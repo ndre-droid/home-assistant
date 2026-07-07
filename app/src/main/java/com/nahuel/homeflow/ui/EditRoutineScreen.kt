@@ -3,6 +3,7 @@ package com.nahuel.homeflow.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +43,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
     var actionDialog by remember { mutableStateOf<Pair<Int, Action?>?>(null) }
     var condDialogFor by remember { mutableStateOf<Int?>(null) }
+    var actionClipboard by remember { mutableStateOf<List<Action>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         if (Store.config.value.hueAppKey.isNotEmpty())
@@ -59,6 +61,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         Modifier
             .fillMaxSize()
             .background(Bg)
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -219,17 +222,49 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
 
                     HorizontalDivider(color = Hairline)
                     Spacer(Modifier.height(4.dp))
-                    Text("dann:", color = TextSec, fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("dann:", color = TextSec, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        if (br.actions.isNotEmpty()) TextButton(
+                            onClick = { actionClipboard = br.actions },
+                            contentPadding = PaddingValues(horizontal = 6.dp)
+                        ) { Text("Kopieren", color = TextSec, fontSize = 12.sp) }
+                        if (actionClipboard.isNotEmpty()) TextButton(
+                            onClick = {
+                                branches = branches.mapIndexed { i, v ->
+                                    if (i == bi) v.copy(actions = v.actions + actionClipboard) else v
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp)
+                        ) { Text("Einfügen (${actionClipboard.size})", color = Blue, fontSize = 12.sp) }
+                    }
 
                     br.actions.forEachIndexed { ai, action ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { actionDialog = bi to action }
-                                .padding(vertical = 4.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         ) {
-                            Column(Modifier.weight(1f)) {
+                            // Reorder handles (up/down) — simple, reliable, no gesture conflicts.
+                            Column {
+                                IconButton(
+                                    onClick = {
+                                        if (ai > 0) branches = branches.mapIndexed { i, v ->
+                                            if (i == bi) v.copy(actions = v.actions.swapAt(ai, ai - 1)) else v
+                                        }
+                                    },
+                                    enabled = ai > 0, modifier = Modifier.size(24.dp)
+                                ) { Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = if (ai > 0) TextSec else Hairline) }
+                                IconButton(
+                                    onClick = {
+                                        if (ai < br.actions.lastIndex) branches = branches.mapIndexed { i, v ->
+                                            if (i == bi) v.copy(actions = v.actions.swapAt(ai, ai + 1)) else v
+                                        }
+                                    },
+                                    enabled = ai < br.actions.lastIndex, modifier = Modifier.size(24.dp)
+                                ) { Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = if (ai < br.actions.lastIndex) TextSec else Hairline) }
+                            }
+                            Column(
+                                Modifier.weight(1f).clickable { actionDialog = bi to action }.padding(vertical = 4.dp)
+                            ) {
                                 Text(describeAction(action, hueLights), color = TextPrim, fontSize = 14.sp)
                                 if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
                                     Text("⚠ Sound-URL fehlt – antippen", color = Pink, fontSize = 12.sp)
@@ -293,6 +328,10 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             }
         )
     }
+}
+
+private fun <T> List<T>.swapAt(a: Int, b: Int): List<T> {
+    val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m
 }
 
 private fun List<Variant>.swap(a: Int, b: Int): List<Variant> {
@@ -406,7 +445,7 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
             "💡 $dev: ${parts.joinToString(", ").ifEmpty { "setzen" }}"
         }
         TargetType.SONOS -> {
-            val dev = cfg.sonos.firstOrNull { it.ip == a.deviceId }?.name ?: a.deviceId
+            val dev = if (a.deviceId == "all") "Alle Speaker" else cfg.sonos.firstOrNull { it.ip == a.deviceId }?.name ?: a.deviceId
             val label = when (a.command) {
                 "play" -> "Play"; "pause" -> "Pause"; "stop" -> "Stopp"
                 "volume" -> "Lautstärke ${a.params["volume"]} %"
@@ -505,9 +544,13 @@ private fun ActionDialog(
                                         onClick = { deviceId = l.id; devOpen = false })
                                 }
                             }
-                            TargetType.SONOS -> cfg.sonos.forEach { s ->
-                                DropdownMenuItem(text = { Text(s.name) },
-                                    onClick = { deviceId = s.ip; devOpen = false })
+                            TargetType.SONOS -> {
+                                DropdownMenuItem(text = { Text("Alle Speaker") },
+                                    onClick = { deviceId = "all"; devOpen = false })
+                                cfg.sonos.forEach { s ->
+                                    DropdownMenuItem(text = { Text(s.name) },
+                                        onClick = { deviceId = s.ip; devOpen = false })
+                                }
                             }
                             TargetType.LG_TV -> cfg.tvs.forEach { t ->
                                 DropdownMenuItem(text = { Text(t.name) },

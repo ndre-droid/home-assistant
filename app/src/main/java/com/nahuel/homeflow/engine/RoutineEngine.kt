@@ -65,7 +65,18 @@ object RoutineEngine {
         return errors
     }
 
-    private suspend fun execute(a: Action): Result<Unit> = when (a.target) {
+    private suspend fun execute(a: Action): Result<Unit> {
+        // Sonos "all": fan the same command out to every configured speaker.
+        if (a.target == TargetType.SONOS && a.deviceId == "all") {
+            val speakers = Store.config.value.sonos
+            if (speakers.isEmpty()) return Result.failure(IllegalArgumentException("Keine Sonos-Speaker konfiguriert"))
+            var lastErr: Throwable? = null
+            speakers.forEach { sp ->
+                execute(a.copy(deviceId = sp.ip)).onFailure { lastErr = it }
+            }
+            return lastErr?.let { Result.failure(it) } ?: Result.success(Unit)
+        }
+        return when (a.target) {
         TargetType.HUE -> HueClient.setLight(
             id = a.deviceId,
             on = a.params["on"]?.toBooleanStrictOrNull(),
@@ -106,5 +117,6 @@ object RoutineEngine {
                 else -> Result.failure(IllegalArgumentException("TV: unbekanntes Kommando ${a.command}"))
             }
         }
+    }
     }
 }
