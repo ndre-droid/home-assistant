@@ -16,6 +16,7 @@
 
     <application
         android:name=".HomeFlowApp"
+        android:enableOnBackInvokedCallback="true"
         android:label="HomeFlow"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.HomeFlow"

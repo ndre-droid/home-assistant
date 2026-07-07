@@ -3,6 +3,7 @@ package com.nahuel.homeflow.data
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import com.nahuel.homeflow.ui.ThemeMode
 
 /** How a routine is started. NFC and widget both end up calling RoutineEngine directly;
  *  DEVICE_STATE is watched by the foreground TriggerService via the Hue event stream. */
@@ -150,7 +151,9 @@ data class Config(
     val biasTv: String = "",
     val biasLights: List<String> = emptyList(),
     val lightOrder: List<String> = emptyList(),  // custom drag&drop order of Hue lights
-    val partnerIp: String = ""                   // partner phone IP for presence check
+    val partnerIp: String = "",                  // partner phone IP for presence check
+    val themeMode: ThemeMode = ThemeMode.SYSTEM, // appearance: follow system / light / dark
+    val dynamicColor: Boolean = false            // Material You wallpaper colors (Android 12+)
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -169,6 +172,7 @@ data class Config(
         put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
         put("lightOrder", JSONArray().also { a -> lightOrder.forEach { a.put(it) } })
         put("partnerIp", partnerIp)
+        put("themeMode", themeMode.name); put("dynamicColor", dynamicColor)
     }
 
     companion object {
@@ -204,7 +208,9 @@ data class Config(
                 lightOrder = o.optJSONArray("lightOrder")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }
                 } ?: emptyList(),
-                partnerIp = o.optString("partnerIp", "")
+                partnerIp = o.optString("partnerIp", ""),
+                themeMode = runCatching { ThemeMode.valueOf(o.optString("themeMode", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM),
+                dynamicColor = o.optBoolean("dynamicColor", false)
             )
         }
     }

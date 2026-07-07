@@ -12,6 +12,11 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.nahuel.homeflow.data.Store
+import com.nahuel.homeflow.ui.HomeFlowTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,8 +35,10 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         TriggerService.sync(this)
 
+        enableEdgeToEdge()
         setContent {
-            HomeFlowTheme {
+            val cfg by Store.config.collectAsState()
+            HomeFlowTheme(themeMode = cfg.themeMode, dynamicColor = cfg.dynamicColor) {
                 AppRoot(
                     nfcWriteRoutineId = nfcWriteRoutineId.value,
                     onRequestNfcWrite = { nfcWriteRoutineId.value = it },
