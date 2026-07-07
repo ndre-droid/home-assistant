@@ -41,8 +41,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val colorPresets = listOf(
-    "#FFFFFF" to Color.White, "#FFB74D" to Color(0xFFFFB74D), "#F062A6" to Pink,
-    "#34D399" to Green, "#3D8BFD" to Blue, "#8B7CF7" to Violet, "#EF4444" to Color(0xFFEF4444)
+    "#FFFFFF" to Color.White, "#FFB74D" to Color(0xFFFFB74D), "#F062A6" to Color(0xFFF062A6),
+    "#34D399" to Color(0xFF34D399), "#3D8BFD" to Color(0xFF3D8BFD), "#8B7CF7" to Color(0xFF8B7CF7), "#EF4444" to Color(0xFFEF4444)
 )
 
 /** Applies the user's custom drag&drop order; unknown lights go to the end. */
