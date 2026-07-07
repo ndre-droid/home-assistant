@@ -6,9 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,41 +22,42 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun TabIcon(ordinal: Int) {
     val icon = when (ordinal) {
-        0 -> Icons.Filled.PlayArrow
-        1 -> Icons.Filled.Home
-        else -> Icons.Filled.Settings
+        0 -> Icons.Outlined.PlayArrow
+        1 -> Icons.Outlined.Home
+        else -> Icons.Outlined.Settings
     }
     Icon(icon, contentDescription = null)
 }
 
-/** Gradient card container used across screens (Hue-style). */
+/** Flat surface card — finer hairline, single clean fill (M3). */
 @Composable
 fun GradientCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CardGradient)
-            .border(1.dp, Hairline, MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(0.5.dp, Hairline, MaterialTheme.shapes.medium)
             .animateContentSize(tween(200))
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content
     )
 }
 
+/** Quiet, uppercase section label — fine tracking, secondary color. */
 @Composable
 fun SectionTitle(text: String) {
     Text(
         text.uppercase(),
         color = TextSec,
-        fontSize = 12.sp,
-        letterSpacing = 1.2.sp,
+        fontSize = 11.sp,
+        letterSpacing = 1.4.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(top = 6.dp, bottom = 8.dp)
+        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
     )
 }
 
 @Composable
 fun HintText(text: String) {
-    Text(text, color = TextSec, fontSize = 13.sp, lineHeight = 18.sp)
+    Text(text, color = TextSec, fontSize = 13.sp, lineHeight = 19.sp)
 }
