@@ -101,7 +101,7 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Geräte", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
+            Text("Geräte", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f))
             Button(
                 onClick = {

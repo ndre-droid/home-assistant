@@ -37,7 +37,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Einstellungen", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+        Text("Einstellungen", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium)
 
         GradientCard {
             SectionTitle("Darstellung")

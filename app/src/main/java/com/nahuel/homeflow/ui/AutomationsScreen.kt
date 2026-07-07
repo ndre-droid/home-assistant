@@ -37,7 +37,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             item {
                 Text(
                     "Automationen",
-                    color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
+                    color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -79,13 +79,16 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             item { Spacer(Modifier.height(80.dp)) }
         }
 
-        FloatingActionButton(
+        ExtendedFloatingActionButton(
             onClick = { showAddChooser.value = true },
             containerColor = Violet,
+            contentColor = androidx.compose.ui.graphics.Color.White,
+            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+            text = { Text("Neu") },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
-        ) { Icon(Icons.Filled.Add, "Neue Automation") }
+        )
 
         if (showAddChooser.value) {
             AlertDialog(
