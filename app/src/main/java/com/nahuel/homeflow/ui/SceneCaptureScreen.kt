@@ -47,7 +47,7 @@ fun SceneCaptureScreen(onClose: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowBack, "Zurück", tint = TextPrim) }
-            Text("Szene aufnehmen", color = TextPrim, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            Text("Szene aufnehmen", color = TextPrim, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
         GradientCard {

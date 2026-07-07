@@ -12,12 +12,14 @@ android {
         applicationId = "com.nahuel.homeflow"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
-    // Shared signing key decoded from the checked-in base64, wrapped so a missing or
-    // corrupt keystore can never fail the whole build at configuration time.
+    // Shared signing key decoded from the checked-in base64 so every build has the
+    // SAME signature -> Android installs updates IN PLACE and your devices + routines
+    // survive. Wrapped in runCatching so a missing/corrupt keystore can never fail
+    // the whole build at configuration time (falls back to the debug key).
     val sharedSigning = runCatching {
         val b64 = rootProject.file("app/homeflow.keystore.b64")
         if (!b64.exists()) return@runCatching null
