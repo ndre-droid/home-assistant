@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -399,6 +400,8 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
 
     CollapsibleSection(key = "tv", title = "LG TV") {
         config.tvs.forEachIndexed { ti, tv ->
+            var editing by remember(tv.ip) { mutableStateOf(false) }
+            var macEdit by remember(tv.ip) { mutableStateOf(tv.mac) }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
                 ReorderArrows(ti, config.tvs.size) { from, to ->
                     Store.updateConfig { it.copy(tvs = it.tvs.moveItem(from, to)) }
@@ -406,39 +409,70 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(tv.name, color = TextPrim)
                     Text(
-                        if (tv.clientKey.isEmpty()) "Nicht gekoppelt" else "Gekoppelt ✓",
-                        color = if (tv.clientKey.isEmpty()) MaterialTheme.colorScheme.error else Green,
+                        buildString {
+                            append(if (tv.clientKey.isEmpty()) "Nicht gekoppelt" else "Gekoppelt ✓")
+                            append(if (tv.mac.isBlank()) "  ·  MAC fehlt" else "  ·  MAC ✓")
+                        },
+                        color = if (tv.clientKey.isEmpty() || tv.mac.isBlank()) MaterialTheme.colorScheme.error else Green,
                         fontSize = 12.sp
                     )
                 }
                 TextButton(onClick = {
                     scope.launch {
-                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt")
-                        else LgTvClient.powerOn(tv.mac).onFailure { onStatus("TV: ${it.message}") }
+                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt – unten das Zahnrad antippen und MAC eintragen.")
+                        else LgTvClient.powerOn(tv.mac)
+                            .onSuccess { onStatus("${tv.name}: Einschalt-Signal gesendet (dauert ein paar Sek.)") }
+                            .onFailure { onStatus("TV: ${it.message}") }
                     }
                 }) { Text("An", color = Green) }
                 TextButton(onClick = {
                     scope.launch {
-                        LgTvClient.powerOff(tv.ip, tv.clientKey).onFailure { onStatus("TV: ${it.message}") }
+                        LgTvClient.powerOff(tv.ip, tv.clientKey).onFailure {
+                            onStatus("TV nicht erreichbar – ist er an? Bei ausgeschaltetem TV geht nur Einschalten.")
+                        }
                     }
                 }) { Text("Aus", color = TextSec) }
-                if (tv.clientKey.isEmpty()) {
-                    TextButton(onClick = {
-                        onStatus("Kopplungs-Anfrage am TV bestätigen…")
-                        scope.launch {
-                            LgTvClient.pair(tv.ip)
-                                .onSuccess { key ->
-                                    Store.updateConfig { cfg ->
-                                        cfg.copy(tvs = cfg.tvs.map {
-                                            if (it.ip == tv.ip) it.copy(clientKey = key) else it
-                                        })
-                                    }
-                                    onStatus("TV gekoppelt ✓")
-                                }
-                                .onFailure { onStatus("TV: ${it.message} (TV an? IP korrekt?)") }
-                        }
-                    }) { Text("Koppeln", color = Violet) }
+                IconButton(onClick = { editing = !editing }) {
+                    Icon(Icons.Filled.Settings, "Bearbeiten", tint = TextSec)
                 }
+            }
+            if (editing) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 22.dp, bottom = 6.dp)) {
+                    OutlinedTextField(
+                        value = macEdit, onValueChange = { macEdit = it },
+                        label = { Text("MAC (für Einschalten)") },
+                        modifier = Modifier.weight(1f), singleLine = true
+                    )
+                    TextButton(onClick = {
+                        Store.updateConfig { cfg ->
+                            cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(mac = macEdit.trim()) else it })
+                        }
+                        editing = false
+                        onStatus("${tv.name}: MAC gespeichert ✓")
+                    }) { Text("Speichern", color = Violet) }
+                }
+                if (tv.clientKey.isEmpty()) {
+                    TextButton(
+                        onClick = {
+                            onStatus("Kopplungs-Anfrage am TV bestätigen…")
+                            scope.launch {
+                                LgTvClient.pair(tv.ip)
+                                    .onSuccess { key ->
+                                        Store.updateConfig { cfg ->
+                                            cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(clientKey = key) else it })
+                                        }
+                                        onStatus("TV gekoppelt ✓")
+                                    }
+                                    .onFailure { onStatus("TV: ${it.message} (TV an? IP korrekt?)") }
+                            }
+                        },
+                        modifier = Modifier.padding(start = 22.dp)
+                    ) { Text("Koppeln", color = Violet) }
+                }
+                TextButton(
+                    onClick = { Store.updateConfig { it.copy(tvs = it.tvs.filterNot { t -> t.ip == tv.ip }) } },
+                    modifier = Modifier.padding(start = 22.dp)
+                ) { Text("TV entfernen", color = Pink) }
             }
         }
         Spacer(Modifier.height(8.dp))
