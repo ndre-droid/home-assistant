@@ -279,7 +279,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 )
             }
             Spacer(Modifier.height(4.dp))
-            HintText("Koordinaten aus Google Maps (lange auf dein Zuhause tippen). Danach Automationen mit Auslöser „Ankunft/Weggehen (GPS)" anlegen. Standort-Berechtigung „immer erlauben" nötig.")
+            HintText("Koordinaten aus Google Maps (lange auf dein Zuhause tippen). Danach Automationen mit Auslöser Ankunft/Weggehen (GPS) anlegen. Standort-Berechtigung auf immer erlauben stellen.")
         }
 
         GradientCard {
