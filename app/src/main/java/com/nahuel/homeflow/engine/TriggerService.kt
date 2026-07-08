@@ -51,9 +51,10 @@ class TriggerService : Service() {
 
         /** Starts or stops the service depending on whether any background work exists. */
         fun sync(ctx: Context) {
+            AlarmScheduler.rescheduleAll(ctx)   // (re)arm TIME/SUN triggers
             val intent = Intent(ctx, TriggerService::class.java)
-            val needed = hasStateTriggers() || hasWifiTriggers() || Store.config.value.biasEnabled
-            if (needed && Store.config.value.hueBridgeIp.isNotEmpty()) {
+            val needed = hasStateTriggers() || hasWifiTriggers() || Store.config.value.biasEnabled || Store.config.value.webServerEnabled
+            if (needed && (Store.config.value.hueBridgeIp.isNotEmpty() || Store.config.value.webServerEnabled)) {
                 if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(intent) else ctx.startService(intent)
             } else {
                 ctx.stopService(intent)
@@ -74,6 +75,11 @@ class TriggerService : Service() {
         if (biasWatcher == null) biasWatcher = scope.launch { biasLoop() }
         if (partnerWatcher == null) partnerWatcher = scope.launch { partnerLoop() }
         if (netCallback == null) registerWifiWatch()
+        if (Store.config.value.webServerEnabled && !WebTriggerServer.isRunning()) {
+            WebTriggerServer.start { id -> RoutineEngine.runAsync(applicationContext, id) }
+        } else if (!Store.config.value.webServerEnabled && WebTriggerServer.isRunning()) {
+            WebTriggerServer.stop()
+        }
         return START_STICKY
     }
 
@@ -219,6 +225,7 @@ class TriggerService : Service() {
     }
 
     override fun onDestroy() {
+        WebTriggerServer.stop()
         eventSource?.cancel()
         netCallback?.let {
             runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) }

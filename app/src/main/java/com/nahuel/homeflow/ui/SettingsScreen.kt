@@ -211,6 +211,32 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
 
         GradientCard {
+            SectionTitle("Gäste-Zugriff (iPhone / Browser)")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Web-Steuerung", color = TextPrim, fontSize = 15.sp)
+                    Text("Startet einen kleinen Server. Gäste öffnen die URL im Browser und lösen Automationen aus, ganz ohne App.",
+                        color = TextSec, fontSize = 12.sp)
+                }
+                Switch(
+                    checked = config.webServerEnabled,
+                    onCheckedChange = { v ->
+                        Store.updateConfig { it.copy(webServerEnabled = v) }
+                        TriggerService.sync(ctx)
+                    },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Violet, uncheckedTrackColor = Surface2)
+                )
+            }
+            if (config.webServerEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Text("Diese Adresse im Browser öffnen (gleiches WLAN oder Tailscale):", color = TextSec, fontSize = 12.sp)
+                Text(com.nahuel.homeflow.engine.WebTriggerServer.localUrl(),
+                    color = Violet, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                HintText("iPhone: Adresse in Safari eingeben, Seite zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button.")
+            }
+        }
+
+        GradientCard {
             SectionTitle("Anleitung")
             Button(
                 onClick = { ctx.startActivity(Intent(ctx, ManualActivity::class.java)) },

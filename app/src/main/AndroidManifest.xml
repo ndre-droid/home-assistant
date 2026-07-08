@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
@@ -58,6 +60,8 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Listens to local smart home device state changes to fire user-defined automations" />
         </service>
+
+        <receiver android:name=".engine.AlarmReceiver" android:exported="false" />
 
         <receiver android:name=".engine.BootReceiver" android:exported="true">
             <intent-filter>

@@ -177,7 +177,8 @@ data class Config(
     val accentColor: String = "",                // custom accent hex (#RRGGBB); empty = default blue
     val generics: List<GenericDevice> = emptyList(), // user HTTP/webhook devices
     val latitude: Double = 52.52,                // for sunrise/sunset (default Berlin)
-    val longitude: Double = 13.405
+    val longitude: Double = 13.405,
+    val webServerEnabled: Boolean = false        // guest web-trigger server for iPhone access
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -199,7 +200,7 @@ data class Config(
         put("generics", JSONArray().also { a ->
             generics.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url).put("method", it.method).put("body", it.body)) }
         })
-        put("latitude", latitude); put("longitude", longitude)
+        put("latitude", latitude); put("longitude", longitude); put("webServerEnabled", webServerEnabled)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
     }
 
@@ -248,7 +249,8 @@ data class Config(
                     }
                 } ?: emptyList(),
                 latitude = o.optDouble("latitude", 52.52),
-                longitude = o.optDouble("longitude", 13.405)
+                longitude = o.optDouble("longitude", 13.405),
+                webServerEnabled = o.optBoolean("webServerEnabled", false)
             )
         }
     }

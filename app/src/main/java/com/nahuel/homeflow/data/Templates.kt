@@ -35,14 +35,20 @@ object Templates {
                 )))
             )
         },
-        Template("Party", "Lichter pulsieren in Farbe, 60 Sek") {
-            Routine(
-                name = "Party",
-                triggers = listOf(Trigger(TriggerType.MANUAL)),
-                variants = listOf(Variant(actions = listOf(
-                    Action(TargetType.HUE, "all", "party", mapOf("seconds" to "60"))
-                )))
-            )
+        Template("Party: Rave", "Schnelles Farb-Feuerwerk, 60 Sek") {
+            partyRoutine("Rave", "rave", 60)
+        },
+        Template("Party: Chill", "Langsame warme Fades") {
+            partyRoutine("Chill", "chill", 120)
+        },
+        Template("Party: Strobe", "Weißes Blitzlicht, 30 Sek") {
+            partyRoutine("Strobe", "strobe", 30)
+        },
+        Template("Party: Sunset", "Warmer Farbverlauf") {
+            partyRoutine("Sunset", "sunset", 120)
+        },
+        Template("Party: Ocean", "Blau-Teal Wellen") {
+            partyRoutine("Ocean", "ocean", 120)
         },
         Template("Rage Quit", "Alles aus, Licht rot") {
             Routine(
@@ -62,5 +68,13 @@ object Templates {
                 )))
             )
         }
+    )
+
+    private fun partyRoutine(name: String, mode: String, seconds: Int) = Routine(
+        name = name,
+        triggers = listOf(Trigger(TriggerType.MANUAL)),
+        variants = listOf(Variant(actions = listOf(
+            Action(TargetType.HUE, "all", "party", mapOf("mode" to mode, "seconds" to seconds.toString()))
+        )))
     )
 }

@@ -80,13 +80,24 @@ object RoutineEngine {
     /** Party: cycle vivid colors on the lights for `seconds`. */
     private suspend fun party(a: Action): Result<Unit> = runCatching {
         val seconds = a.params["seconds"]?.toIntOrNull()?.coerceIn(5, 600) ?: 60
-        val colors = listOf("#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF")
+        val mode = a.params["mode"] ?: "rave"
+        // Each preset: palette, step delay (ms), brightness (or -1 = alternate flash).
+        val (colors, stepMs, bri) = when (mode) {
+            "chill"  -> Triple(listOf("#FF8C42", "#FF6B6B", "#C44FD4", "#6B5BE8"), 2500L, 45)
+            "strobe" -> Triple(listOf("#FFFFFF", "#000010"), 120L, 100)
+            "sunset" -> Triple(listOf("#FFB347", "#FF7F50", "#FF6B6B", "#C71585", "#4B2E83"), 3000L, 55)
+            "ocean"  -> Triple(listOf("#00CED1", "#1E90FF", "#20B2AA", "#4169E1", "#00FFFF"), 2000L, 50)
+            else     -> Triple(listOf("#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF"), 600L, 100)
+        }
         val endAt = System.currentTimeMillis() + seconds * 1000L
         var i = 0
         while (System.currentTimeMillis() < endAt) {
-            HueClient.setLight(a.deviceId, on = true, brightness = 100, colorHex = colors[i % colors.size])
+            val c = colors[i % colors.size]
+            // strobe: flash on/off by alternating a near-black "off" color
+            val b = if (mode == "strobe" && c == "#000010") 1 else bri
+            HueClient.setLight(a.deviceId, on = true, brightness = b, colorHex = c)
             i++
-            kotlinx.coroutines.delay(700)
+            kotlinx.coroutines.delay(stepMs)
         }
     }
 
