@@ -7,7 +7,7 @@ import com.nahuel.homeflow.ui.ThemeMode
 
 /** How a routine is started. NFC and widget both end up calling RoutineEngine directly;
  *  DEVICE_STATE is watched by the foreground TriggerService via the Hue event stream. */
-enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI, TIME, SUN }
+enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI, TIME, SUN, ARRIVE_HOME, LEAVE_HOME }
 
 /** A single IF-condition on a branch. All conditions of a branch must match. */
 enum class CondType { DAY, NIGHT, SPEAKER_IDLE, SPEAKER_PLAYING, PARTNER_HOME, PARTNER_AWAY }
@@ -178,7 +178,11 @@ data class Config(
     val generics: List<GenericDevice> = emptyList(), // user HTTP/webhook devices
     val latitude: Double = 52.52,                // for sunrise/sunset (default Berlin)
     val longitude: Double = 13.405,
-    val webServerEnabled: Boolean = false        // guest web-trigger server for iPhone access
+    val webServerEnabled: Boolean = false,       // guest web-trigger server for iPhone access
+    val shakeRoutineId: String = "",             // routine fired on hard phone shake ("" = off)
+    val homeLat: Double = 0.0,                   // geofence home center (0 = not set)
+    val homeLon: Double = 0.0,
+    val geofenceRadius: Int = 150                // meters
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -200,7 +204,8 @@ data class Config(
         put("generics", JSONArray().also { a ->
             generics.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url).put("method", it.method).put("body", it.body)) }
         })
-        put("latitude", latitude); put("longitude", longitude); put("webServerEnabled", webServerEnabled)
+        put("latitude", latitude); put("longitude", longitude); put("webServerEnabled", webServerEnabled); put("shakeRoutineId", shakeRoutineId)
+        put("homeLat", homeLat); put("homeLon", homeLon); put("geofenceRadius", geofenceRadius)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
     }
 
@@ -250,7 +255,11 @@ data class Config(
                 } ?: emptyList(),
                 latitude = o.optDouble("latitude", 52.52),
                 longitude = o.optDouble("longitude", 13.405),
-                webServerEnabled = o.optBoolean("webServerEnabled", false)
+                webServerEnabled = o.optBoolean("webServerEnabled", false),
+                shakeRoutineId = o.optString("shakeRoutineId", ""),
+                homeLat = o.optDouble("homeLat", 0.0),
+                homeLon = o.optDouble("homeLon", 0.0),
+                geofenceRadius = o.optInt("geofenceRadius", 150)
             )
         }
     }

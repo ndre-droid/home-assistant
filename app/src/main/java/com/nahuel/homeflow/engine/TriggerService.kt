@@ -3,6 +3,16 @@ package com.nahuel.homeflow.engine
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.location.Location
+import android.location.LocationManager
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import kotlin.math.sqrt
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -33,6 +43,11 @@ class TriggerService : Service() {
     private var partnerWatcher: Job? = null
     private var netCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var wifiConnected = false
+    private var sensorManager: SensorManager? = null
+    private var shakeListener: SensorEventListener? = null
+    private var lastShake = 0L
+    private var geoWatcher: Job? = null
+    @Volatile private var wasHome: Boolean? = null
 
     companion object {
         const val CHANNEL_ID = "homeflow_trigger"
@@ -53,8 +68,8 @@ class TriggerService : Service() {
         fun sync(ctx: Context) {
             AlarmScheduler.rescheduleAll(ctx)   // (re)arm TIME/SUN triggers
             val intent = Intent(ctx, TriggerService::class.java)
-            val needed = hasStateTriggers() || hasWifiTriggers() || Store.config.value.biasEnabled || Store.config.value.webServerEnabled
-            if (needed && (Store.config.value.hueBridgeIp.isNotEmpty() || Store.config.value.webServerEnabled)) {
+            val needed = hasStateTriggers() || hasWifiTriggers() || Store.config.value.biasEnabled || Store.config.value.webServerEnabled || Store.config.value.shakeRoutineId.isNotBlank()
+            if (needed && (Store.config.value.hueBridgeIp.isNotEmpty() || Store.config.value.webServerEnabled || Store.config.value.shakeRoutineId.isNotBlank())) {
                 if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(intent) else ctx.startService(intent)
             } else {
                 ctx.stopService(intent)
@@ -80,6 +95,8 @@ class TriggerService : Service() {
         } else if (!Store.config.value.webServerEnabled && WebTriggerServer.isRunning()) {
             WebTriggerServer.stop()
         }
+        registerShake()
+        if (geoWatcher == null) geoWatcher = scope.launch { geofenceLoop() }
         return START_STICKY
     }
 
@@ -224,7 +241,73 @@ class TriggerService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    /** Polls location every ~90s; fires ARRIVE_HOME/LEAVE_HOME when crossing the home radius. */
+    private suspend fun geofenceLoop() {
+        while (true) {
+            val cfg = Store.config.value
+            val hasGeoRoutine = Store.routines.value.any { r ->
+                r.enabled && r.triggers.any { it.type == TriggerType.ARRIVE_HOME || it.type == TriggerType.LEAVE_HOME }
+            }
+            if (hasGeoRoutine && cfg.homeLat != 0.0 && cfg.homeLon != 0.0 && hasLocationPermission()) {
+                val loc = lastKnownLocation()
+                if (loc != null) {
+                    val d = FloatArray(1)
+                    Location.distanceBetween(loc.latitude, loc.longitude, cfg.homeLat, cfg.homeLon, d)
+                    val inside = d[0] <= cfg.geofenceRadius
+                    val prev = wasHome
+                    if (prev != null && prev != inside) {
+                        val want = if (inside) TriggerType.ARRIVE_HOME else TriggerType.LEAVE_HOME
+                        Store.routines.value.filter { r ->
+                            r.enabled && r.triggers.any { it.type == want }
+                        }.forEach { runCatching { RoutineEngine.runAsync(this, it) } }
+                    }
+                    wasHome = inside
+                }
+            }
+            kotlinx.coroutines.delay(90_000)
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun lastKnownLocation(): Location? = runCatching {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+    }.getOrNull()
+
+    private fun registerShake() {
+        if (Store.config.value.shakeRoutineId.isBlank()) { unregisterShake(); return }
+        if (shakeListener != null) return
+        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        sensorManager = sm
+        val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        shakeListener = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                val g = sqrt(e.values[0]*e.values[0] + e.values[1]*e.values[1] + e.values[2]*e.values[2]) / 9.81f
+                if (g > 2.7f) {   // hard shake threshold
+                    val now = System.currentTimeMillis()
+                    if (now - lastShake > 2000) {   // debounce
+                        lastShake = now
+                        val id = Store.config.value.shakeRoutineId
+                        if (id.isNotBlank()) RoutineEngine.runAsync(applicationContext, id)
+                    }
+                }
+            }
+            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+        }
+        sm.registerListener(shakeListener, accel, SensorManager.SENSOR_DELAY_UI)
+    }
+
+    private fun unregisterShake() {
+        shakeListener?.let { sensorManager?.unregisterListener(it) }
+        shakeListener = null
+    }
+
     override fun onDestroy() {
+        unregisterShake()
         WebTriggerServer.stop()
         eventSource?.cancel()
         netCallback?.let {

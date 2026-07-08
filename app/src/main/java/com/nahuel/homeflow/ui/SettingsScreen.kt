@@ -232,8 +232,54 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 Text("Diese Adresse im Browser öffnen (gleiches WLAN oder Tailscale):", color = TextSec, fontSize = 12.sp)
                 Text(com.nahuel.homeflow.engine.WebTriggerServer.localUrl(),
                     color = Violet, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                HintText("iPhone: Adresse in Safari eingeben, Seite zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button.")
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    QrCode(com.nahuel.homeflow.engine.WebTriggerServer.localUrl(), sizePx = 480,
+                        modifier = Modifier.size(200.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                HintText("iPhone-Kamera auf den QR-Code halten, in Safari öffnen, zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button.")
             }
+        }
+
+        GradientCard {
+            SectionTitle("Schütteln & Standort")
+            val routines by Store.routines.collectAsState()
+            Text("Bei Schütteln ausführen", color = TextPrim, fontSize = 15.sp)
+            var shakeOpen by remember { mutableStateOf(false) }
+            val shakeName = routines.firstOrNull { it.id == config.shakeRoutineId }?.name ?: "Aus"
+            Box {
+                OutlinedButton(onClick = { shakeOpen = true }) { Text(shakeName, color = TextPrim) }
+                DropdownMenu(expanded = shakeOpen, onDismissRequest = { shakeOpen = false }) {
+                    DropdownMenuItem(text = { Text("Aus") }, onClick = {
+                        Store.updateConfig { it.copy(shakeRoutineId = "") }; TriggerService.sync(ctx); shakeOpen = false
+                    })
+                    routines.forEach { r ->
+                        DropdownMenuItem(text = { Text(r.name) }, onClick = {
+                            Store.updateConfig { it.copy(shakeRoutineId = r.id) }; TriggerService.sync(ctx); shakeOpen = false
+                        })
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            HintText("Handy kräftig schütteln, um diese Automation auszulösen (z. B. Panik-Aus). Der Hintergrunddienst muss laufen.")
+
+            Spacer(Modifier.height(12.dp))
+            Text("Zuhause-Standort (für GPS-Trigger)", color = TextPrim, fontSize = 15.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = if (config.homeLat == 0.0) "" else config.homeLat.toString(),
+                    onValueChange = { v -> Store.updateConfig { it.copy(homeLat = v.toDoubleOrNull() ?: 0.0) } },
+                    label = { Text("Breite (lat)") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+                OutlinedTextField(
+                    value = if (config.homeLon == 0.0) "" else config.homeLon.toString(),
+                    onValueChange = { v -> Store.updateConfig { it.copy(homeLon = v.toDoubleOrNull() ?: 0.0) } },
+                    label = { Text("Länge (lon)") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            HintText("Koordinaten aus Google Maps (lange auf dein Zuhause tippen). Danach Automationen mit Auslöser „Ankunft/Weggehen (GPS)" anlegen. Standort-Berechtigung „immer erlauben" nötig.")
         }
 
         GradientCard {

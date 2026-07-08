@@ -188,4 +188,6 @@ fun triggerLabel(t: TriggerType): String = when (t) {
     TriggerType.LEAVE_WIFI -> "Beim Verlassen des WLANs"
     TriggerType.TIME -> "Zu einer Uhrzeit"
     TriggerType.SUN -> "Sonnenauf-/untergang"
+    TriggerType.ARRIVE_HOME -> "Beim Nachhausekommen"
+    TriggerType.LEAVE_HOME -> "Beim Verlassen (GPS)"
 }

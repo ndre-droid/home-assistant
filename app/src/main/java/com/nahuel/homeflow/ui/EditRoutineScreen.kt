@@ -127,6 +127,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                                     TriggerType.LEAVE_WIFI -> "WLAN weg"
                                     TriggerType.TIME -> "Uhrzeit"
                                     TriggerType.SUN -> "Sonne"
+                                    TriggerType.ARRIVE_HOME -> "Ankunft"
+                                    TriggerType.LEAVE_HOME -> "Weggehen"
                                 })
                             }
                         )
@@ -215,6 +217,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                             TriggerType.LEAVE_WIFI -> "WLAN verlassen"
                             TriggerType.TIME -> "Uhrzeit ${t.time}"
                             TriggerType.SUN -> if (t.sunEvent == "SUNRISE") "Sonnenaufgang" else "Sonnenuntergang"
+                            TriggerType.ARRIVE_HOME -> "Ankunft zuhause"
+                            TriggerType.LEAVE_HOME -> "Verlassen (GPS)"
                         }
                     },
                     color = TextPrim, fontSize = 13.sp
