@@ -106,7 +106,7 @@ object RoutineEngine {
                 "off" -> LgTvClient.powerOff(tv.ip, tv.clientKey)
                 "on" ->
                     if (tv.mac.isBlank()) Result.failure(IllegalArgumentException("TV an: MAC-Adresse fehlt (Geräte-Tab)"))
-                    else LgTvClient.powerOn(tv.mac)
+                    else LgTvClient.powerOnAndWait(tv.mac, tv.ip)
                 "volume" -> LgTvClient.setVolume(tv.ip, tv.clientKey, a.params["volume"]?.toIntOrNull() ?: 10)
                 "mute" -> LgTvClient.setMute(tv.ip, tv.clientKey, true)
                 "app" -> LgTvClient.launchApp(tv.ip, tv.clientKey, a.params["appId"].orEmpty(), a.params["contentId"])

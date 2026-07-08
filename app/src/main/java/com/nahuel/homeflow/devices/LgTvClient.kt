@@ -4,6 +4,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
+import java.net.Socket
+import java.net.InetSocketAddress
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -114,7 +117,13 @@ object LgTvClient {
         require(appId.isNotBlank()) { "Keine App gewählt" }
         val payload = JSONObject().put("id", appId)
         contentId?.takeIf { it.isNotBlank() }?.let { payload.put("contentId", it) }
-        session(ip, key, "ssap://system.launcher/launch", payload); Unit
+        // Retry once: right after a cold boot the first SSAP call can still miss.
+        val first = runCatching { session(ip, key, "ssap://system.launcher/launch", payload) }
+        if (first.isFailure) {
+            delay(2000)
+            session(ip, key, "ssap://system.launcher/launch", payload)
+        }
+        Unit
     }
 
     /** Foreground app id (netflix, youtube.leanback.v4, com.webos.app.hdmi2, ...). Fails fast if TV is off. */
@@ -138,4 +147,35 @@ object LgTvClient {
             }
         }
     }
+
+    /**
+     * Wake-on-LAN, then wait until the TV actually accepts connections (webOS needs
+     * ~10-30s to boot). Polls the SSAP port so the next action only runs once the TV
+     * is really awake. Returns success as soon as it's reachable, or after maxWaitMs.
+     */
+    suspend fun powerOnAndWait(mac: String, ip: String, maxWaitMs: Long = 35_000): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val wol = powerOn(mac)
+            if (wol.isFailure) return@withContext wol
+            val deadline = System.currentTimeMillis() + maxWaitMs
+            while (System.currentTimeMillis() < deadline) {
+                val reachable = runCatching {
+                    Socket().use { it.connect(InetSocketAddress(ip, 3001), 1500) }
+                    true
+                }.getOrElse {
+                    runCatching {
+                        Socket().use { it.connect(InetSocketAddress(ip, 3000), 1500) }
+                        true
+                    }.getOrDefault(false)
+                }
+                if (reachable) {
+                    delay(1500) // small settle so SSAP is ready to register, not just the socket
+                    return@withContext Result.success(Unit)
+                }
+                delay(1500)
+            }
+            // Reachability never confirmed; still report success so the WoL itself isn't
+            // treated as an error - the TV may just be slow, and the next action can retry.
+            Result.success(Unit)
+        }
 }
