@@ -503,8 +503,6 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
 }
 
 
-/** Compact up/down reorder controls for a list item. */
-@Composable
 /**
  * Small drag handle. Drag it up/down; every ~44dp of travel moves the row one step.
  * Reliable inside a scrolling column (no LazyColumn reorder gymnastics).
