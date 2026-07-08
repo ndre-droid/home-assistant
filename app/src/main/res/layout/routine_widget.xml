@@ -4,26 +4,50 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="12dp">
+    android:orientation="vertical"
+    android:padding="6dp">
 
-    <ImageView
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:src="@drawable/ic_play"
-        android:contentDescription="@null" />
-
-    <TextView
-        android:id="@+id/widget_name"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+    <LinearLayout
+        android:id="@+id/widget_row0"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginStart="10dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="@string/app_name"
-        android:textColor="@color/widget_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
+
+        <TextView android:id="@+id/btn0" style="@style/WidgetBtn" />
+        <TextView android:id="@+id/btn1" style="@style/WidgetBtn" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_row1"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <TextView android:id="@+id/btn2" style="@style/WidgetBtn" />
+        <TextView android:id="@+id/btn3" style="@style/WidgetBtn" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_row2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <TextView android:id="@+id/btn4" style="@style/WidgetBtn" />
+        <TextView android:id="@+id/btn5" style="@style/WidgetBtn" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_row3"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <TextView android:id="@+id/btn6" style="@style/WidgetBtn" />
+        <TextView android:id="@+id/btn7" style="@style/WidgetBtn" />
+    </LinearLayout>
 </LinearLayout>
