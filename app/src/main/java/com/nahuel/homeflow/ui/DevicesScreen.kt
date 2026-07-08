@@ -104,8 +104,8 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Geräte", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f))
+            ScreenTitle("Geräte")
+            Spacer(Modifier.weight(1f))
             Button(
                 onClick = {
                     scope.launch {
@@ -133,7 +133,7 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Weitere Geräte", color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("Matter, Shelly, Zigbee & mehr – in Vorbereitung", color = TextSec, fontSize = 12.sp)
+                    Text("Matter, Shelly, Zigbee & mehr, in Vorbereitung", color = TextSec, fontSize = 12.sp)
                 }
                 AssistChip(onClick = {}, enabled = false, label = { Text("Bald") })
             }
@@ -187,7 +187,7 @@ private fun HueSection(config: Config, lights: List<HueLight>, onStatus: (String
             SortableLightList(lights)
         } else {
             lights.forEach { light -> LightRow(light) }
-            if (lights.isEmpty()) HintText("Keine Lampen gefunden – Aktualisieren tippen.")
+            if (lights.isEmpty()) HintText("Keine Lampen gefunden, Aktualisieren tippen.")
         }
     }
 }
@@ -419,7 +419,7 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
                 }
                 TextButton(onClick = {
                     scope.launch {
-                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt – unten das Zahnrad antippen und MAC eintragen.")
+                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt, unten das Zahnrad antippen und MAC eintragen.")
                         else LgTvClient.powerOn(tv.mac)
                             .onSuccess { onStatus("${tv.name}: Einschalt-Signal gesendet (dauert ein paar Sek.)") }
                             .onFailure { onStatus("TV: ${it.message}") }
@@ -428,7 +428,7 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
                 TextButton(onClick = {
                     scope.launch {
                         LgTvClient.powerOff(tv.ip, tv.clientKey).onFailure {
-                            onStatus("TV nicht erreichbar – ist er an? Bei ausgeschaltetem TV geht nur Einschalten.")
+                            onStatus("TV nicht erreichbar, ist er an? Bei ausgeschaltetem TV geht nur Einschalten.")
                         }
                     }
                 }) { Text("Aus", color = TextSec) }

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,26 +37,27 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    "Automationen",
-                    color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+                ScreenTitle("Automationen")
             }
             if (routines.isEmpty()) {
                 item {
                     GradientCard {
                         Text("Noch keine Automationen", color = TextPrim, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
-                        HintText("Tippe auf +, um eine Automation mit Auslöser, Bedingungen und Aktionen zu bauen – oder nimm den aktuellen Zustand als Szene auf.")
+                        HintText("Tippe auf +, um eine Automation mit Auslöser, Bedingungen und Aktionen zu bauen, oder nimm den aktuellen Zustand als Szene auf.")
                     }
                 }
             }
             items(routines, key = { it.id }) { r ->
-                GradientCard(Modifier.clickable { onEdit(r.id) }) {
+                val interaction = remember { MutableInteractionSource() }
+                GradientCard(
+                    Modifier
+                        .pressScale(interaction)
+                        .clickable(interaction, indication = null) { onEdit(r.id) }
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(r.name, color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text(r.name, color = TextPrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(2.dp))
                             Text(r.triggers.joinToString(" · ") { triggerLabel(it.type) }, color = TextSec, fontSize = 12.sp)
                         }

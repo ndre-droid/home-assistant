@@ -54,7 +54,6 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     var condDialogFor by remember { mutableStateOf<Int?>(null) }
     var actionClipboard by remember { mutableStateOf<List<Action>>(emptyList()) }
     var justSaved by remember { mutableStateOf(false) }
-    val savedScale by animateFloatAsState(if (justSaved) 1.05f else 1f, label = "savedScale")
 
     LaunchedEffect(Unit) {
         if (Store.config.value.hueAppKey.isNotEmpty())
@@ -81,7 +80,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowBack, "Zurück", tint = TextPrim) }
             Text(
                 if (existing == null) "Neue Automation" else "Bearbeiten",
-                color = TextPrim, fontSize = 20.sp, fontWeight = FontWeight.Medium,
+                color = TextPrim, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.3).sp,
                 modifier = Modifier.weight(1f)
             )
             if (existing != null) {
@@ -278,7 +278,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                             ) {
                                 Text(describeAction(action, hueLights), color = TextPrim, fontSize = 14.sp)
                                 if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
-                                    Text("⚠ Sound-URL fehlt – antippen", color = Pink, fontSize = 12.sp)
+                                    Text("⚠ Sound-URL fehlt, antippen", color = Pink, fontSize = 12.sp)
                                 }
                             }
                             IconButton(onClick = {
@@ -310,7 +310,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (justSaved) Green else Violet
                 ),
-                modifier = Modifier.weight(1f).graphicsLayer { scaleX = savedScale; scaleY = savedScale }
+                modifier = Modifier.weight(1f)
             ) {
                 AnimatedContent(targetState = justSaved, label = "saveLabel") { saved ->
                     if (saved) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -366,7 +366,7 @@ private fun branchTitle(bi: Int, br: Variant, total: Int): String = when {
     br.conditions.isNotEmpty() -> "Sonst wenn"
     total == 1 -> "Immer"
     bi == total - 1 -> "Sonst"
-    else -> "Immer (fängt alles ab – nach unten schieben?)"
+    else -> "Immer (fängt alles ab, nach unten schieben?)"
 }
 
 fun condLabel(c: Cond): String {
@@ -609,7 +609,7 @@ private fun ActionDialog(
                         }
                         if (color.isNotEmpty()) Text("Farbe: $color", color = TextSec, fontSize = 12.sp)
                         OutlinedTextField(value = brightness, onValueChange = { brightness = it },
-                            label = { Text("Helligkeit 1–100 (leer = unverändert)") }, singleLine = true)
+                            label = { Text("Helligkeit 1-100 (leer = unverändert)") }, singleLine = true)
                         if (deviceId == "all" && hueLights.isNotEmpty()) {
                             Spacer(Modifier.height(4.dp))
                             Text("Ausnehmen (bleiben unverändert):", color = TextSec, fontSize = 12.sp)
@@ -656,11 +656,11 @@ private fun ActionDialog(
                         }
                         if (command == "volume" || command == "play_uri") {
                             OutlinedTextField(value = volume, onValueChange = { volume = it },
-                                label = { Text("Lautstärke 0–100") }, singleLine = true)
+                                label = { Text("Lautstärke 0-100") }, singleLine = true)
                         }
                         if (command == "play_uri") {
                             OutlinedTextField(value = uri, onValueChange = { uri = it },
-                                label = { Text("Audio-URL (MP3/Stream – kein YouTube)") }, singleLine = true)
+                                label = { Text("Audio-URL (MP3/Stream, kein YouTube)") }, singleLine = true)
                             TextButton(onClick = { showRadio = true }, contentPadding = PaddingValues(0.dp)) {
                                 Text("🔍 Sounds & Sender suchen", color = Blue)
                             }
@@ -679,7 +679,7 @@ private fun ActionDialog(
                         }
                         if (command == "volume") {
                             OutlinedTextField(value = volume, onValueChange = { volume = it },
-                                label = { Text("Lautstärke 0–100") }, singleLine = true)
+                                label = { Text("Lautstärke 0-100") }, singleLine = true)
                         }
                         if (command == "app") {
                             var appOpen by remember { mutableStateOf(false) }

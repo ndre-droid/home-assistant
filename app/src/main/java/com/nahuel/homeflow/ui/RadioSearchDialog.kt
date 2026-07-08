@@ -27,7 +27,7 @@ fun RadioSearchDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
         busy = true; error = ""
         scope.launch {
             RadioBrowser.search(query)
-                .onSuccess { results = it; if (it.isEmpty()) error = "Nichts gefunden – anderen Begriff probieren" }
+                .onSuccess { results = it; if (it.isEmpty()) error = "Nichts gefunden, anderen Begriff probieren" }
                 .onFailure { error = it.message ?: "Fehler" }
             busy = false
         }

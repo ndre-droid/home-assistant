@@ -38,7 +38,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Einstellungen", color = TextPrim, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+        ScreenTitle("Einstellungen")
 
         GradientCard {
             SectionTitle("Darstellung")
@@ -67,7 +67,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     Text(
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
                             "Nutzt die Farben deines Hintergrundbilds (Material You)"
-                        else "Erst ab Android 12 verfügbar – nutzt sonst das App-Design",
+                        else "Erst ab Android 12 verfügbar, nutzt sonst das App-Design",
                         color = TextSec, fontSize = 12.sp
                     )
                 }
