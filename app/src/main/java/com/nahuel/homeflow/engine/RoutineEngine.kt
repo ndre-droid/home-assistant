@@ -8,6 +8,7 @@ import com.nahuel.homeflow.data.*
 import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.LgTvClient
 import com.nahuel.homeflow.devices.SonosClient
+import com.nahuel.homeflow.devices.GenericClient
 import kotlinx.coroutines.*
 
 /**
@@ -27,8 +28,9 @@ object RoutineEngine {
         val appCtx = ctx.applicationContext
         scope.launch {
             val errors = run(routine)
+            Store.logRun(routine.name, errors.isEmpty(), errors.firstOrNull() ?: "")
             val msg = if (errors.isEmpty()) "▶ ${routine.name}"
-            else "${routine.name}: ${errors.size} Fehler – ${errors.first()}"
+            else "${routine.name}: ${errors.size} Fehler, ${errors.first()}"
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show()
             }
@@ -60,6 +62,34 @@ object RoutineEngine {
         return errors
     }
 
+    /** Sunrise-style fade: deep red -> warm -> bright white over `minutes`. */
+    private suspend fun wakeUp(a: Action): Result<Unit> = runCatching {
+        val minutes = a.params["minutes"]?.toIntOrNull()?.coerceIn(1, 60) ?: 20
+        val steps = 20
+        val stepMs = (minutes * 60_000L) / steps
+        val colors = listOf("#3A0A0A", "#5A1A0A", "#8A3A10", "#B5651D", "#D9963C", "#F0C270", "#FFE8C0", "#FFFFFF")
+        for (i in 0 until steps) {
+            val t = i.toFloat() / (steps - 1)
+            val bri = (5 + t * 95).toInt()
+            val color = colors[(t * (colors.size - 1)).toInt().coerceIn(0, colors.size - 1)]
+            HueClient.setLight(a.deviceId, on = true, brightness = bri, colorHex = color)
+            kotlinx.coroutines.delay(stepMs)
+        }
+    }
+
+    /** Party: cycle vivid colors on the lights for `seconds`. */
+    private suspend fun party(a: Action): Result<Unit> = runCatching {
+        val seconds = a.params["seconds"]?.toIntOrNull()?.coerceIn(5, 600) ?: 60
+        val colors = listOf("#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF")
+        val endAt = System.currentTimeMillis() + seconds * 1000L
+        var i = 0
+        while (System.currentTimeMillis() < endAt) {
+            HueClient.setLight(a.deviceId, on = true, brightness = 100, colorHex = colors[i % colors.size])
+            i++
+            kotlinx.coroutines.delay(700)
+        }
+    }
+
     private suspend fun execute(a: Action): Result<Unit> {
         // Sonos "all": fan the same command out to every configured speaker.
         if (a.target == TargetType.SONOS && a.deviceId == "all") {
@@ -72,13 +102,22 @@ object RoutineEngine {
             return lastErr?.let { Result.failure(it) } ?: Result.success(Unit)
         }
         return when (a.target) {
-        TargetType.HUE -> HueClient.setLight(
-            id = a.deviceId,
-            on = a.params["on"]?.toBooleanStrictOrNull(),
-            brightness = a.params["brightness"]?.toIntOrNull(),
-            colorHex = a.params["color"]?.takeIf { it.startsWith("#") && it.length == 7 },
-            exclude = a.params["exclude"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
-        )
+        TargetType.HUE -> when (a.command) {
+            "wakeup" -> wakeUp(a)   // fade deep-red -> bright white over N minutes
+            "party"  -> party(a)    // cycle colors for N seconds
+            "countdown_off" -> runCatching {
+                val min = a.params["minutes"]?.toIntOrNull()?.coerceIn(1, 240) ?: 10
+                kotlinx.coroutines.delay(min * 60_000L)
+                HueClient.setLight(a.deviceId, on = false, brightness = null, colorHex = null).getOrThrow()
+            }
+            else -> HueClient.setLight(
+                id = a.deviceId,
+                on = a.params["on"]?.toBooleanStrictOrNull(),
+                brightness = a.params["brightness"]?.toIntOrNull(),
+                colorHex = a.params["color"]?.takeIf { it.startsWith("#") && it.length == 7 },
+                exclude = a.params["exclude"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+            )
+        }
 
         TargetType.SONOS -> when (a.command) {
             "play" ->
@@ -112,6 +151,12 @@ object RoutineEngine {
                 "app" -> LgTvClient.launchApp(tv.ip, tv.clientKey, a.params["appId"].orEmpty(), a.params["contentId"])
                 else -> Result.failure(IllegalArgumentException("TV: unbekanntes Kommando ${a.command}"))
             }
+        }
+
+        TargetType.GENERIC -> {
+            val dev = Store.config.value.generics.firstOrNull { it.name == a.deviceId }
+            if (dev == null) Result.failure(IllegalArgumentException("Gerät ${a.deviceId} nicht konfiguriert"))
+            else GenericClient.fire(dev.url, dev.method, dev.body)
         }
     }
     }

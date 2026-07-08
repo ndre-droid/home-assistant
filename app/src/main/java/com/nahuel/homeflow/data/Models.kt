@@ -7,7 +7,7 @@ import com.nahuel.homeflow.ui.ThemeMode
 
 /** How a routine is started. NFC and widget both end up calling RoutineEngine directly;
  *  DEVICE_STATE is watched by the foreground TriggerService via the Hue event stream. */
-enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI }
+enum class TriggerType { MANUAL, NFC, DEVICE_STATE, LEAVE_WIFI, TIME, SUN }
 
 /** A single IF-condition on a branch. All conditions of a branch must match. */
 enum class CondType { DAY, NIGHT, SPEAKER_IDLE, SPEAKER_PLAYING, PARTNER_HOME, PARTNER_AWAY }
@@ -23,24 +23,31 @@ data class Cond(val type: CondType, val deviceId: String = "") {
     }
 }
 
-enum class TargetType { HUE, SONOS, LG_TV }
+enum class TargetType { HUE, SONOS, LG_TV, GENERIC }
 
 data class Trigger(
     val type: TriggerType = TriggerType.MANUAL,
     val hueLightId: String = "",
     val toState: Boolean = true, // fire when light turns on (true) or off (false)
-    val partnerAware: Boolean = true // LEAVE_WIFI: skip if partner device recently seen at home
+    val partnerAware: Boolean = true, // LEAVE_WIFI: skip if partner device recently seen at home
+    val time: String = "07:00",       // TIME trigger: HH:MM
+    val sunEvent: String = "SUNSET",  // SUN trigger: SUNRISE | SUNSET
+    val sunOffsetMin: Int = 0         // SUN: minutes before(-)/after(+) the event
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("type", type.name).put("hueLightId", hueLightId).put("toState", toState)
         .put("partnerAware", partnerAware)
+        .put("time", time).put("sunEvent", sunEvent).put("sunOffsetMin", sunOffsetMin)
 
     companion object {
         fun fromJson(o: JSONObject) = Trigger(
             type = runCatching { TriggerType.valueOf(o.optString("type", "MANUAL")) }.getOrDefault(TriggerType.MANUAL),
             hueLightId = o.optString("hueLightId", ""),
             toState = o.optBoolean("toState", true),
-            partnerAware = o.optBoolean("partnerAware", true)
+            partnerAware = o.optBoolean("partnerAware", true),
+            time = o.optString("time", "07:00"),
+            sunEvent = o.optString("sunEvent", "SUNSET"),
+            sunOffsetMin = o.optInt("sunOffsetMin", 0)
         )
     }
 }
@@ -144,6 +151,10 @@ data class Routine(
 
 data class SonosSpeaker(val name: String, val ip: String)
 data class LgTv(val name: String, val ip: String, val clientKey: String = "", val mac: String = "")
+/** A user-defined HTTP endpoint: any webhook/URL device (Shelly, Tasmota, HA, IFTTT...). */
+data class GenericDevice(val name: String, val url: String, val method: String = "GET", val body: String = "")
+/** One entry in the run history. */
+data class RunLog(val routineName: String, val timestamp: Long, val ok: Boolean, val detail: String = "")
 
 data class Config(
     val hueBridgeIp: String = "",
@@ -163,7 +174,10 @@ data class Config(
     val myPhoneIp: String = "",                  // your phone IP for leave-wifi detection
     val themeMode: ThemeMode = ThemeMode.SYSTEM, // appearance: follow system / light / dark
     val dynamicColor: Boolean = false,           // Material You wallpaper colors (Android 12+)
-    val accentColor: String = ""                 // custom accent hex (#RRGGBB); empty = default blue
+    val accentColor: String = "",                // custom accent hex (#RRGGBB); empty = default blue
+    val generics: List<GenericDevice> = emptyList(), // user HTTP/webhook devices
+    val latitude: Double = 52.52,                // for sunrise/sunset (default Berlin)
+    val longitude: Double = 13.405
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -182,6 +196,10 @@ data class Config(
         put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
         put("lightOrder", JSONArray().also { a -> lightOrder.forEach { a.put(it) } })
         put("partnerIp", partnerIp); put("myPhoneIp", myPhoneIp)
+        put("generics", JSONArray().also { a ->
+            generics.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url).put("method", it.method).put("body", it.body)) }
+        })
+        put("latitude", latitude); put("longitude", longitude)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
     }
 
@@ -222,7 +240,15 @@ data class Config(
                 myPhoneIp = o.optString("myPhoneIp", ""),
                 themeMode = runCatching { ThemeMode.valueOf(o.optString("themeMode", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM),
                 dynamicColor = o.optBoolean("dynamicColor", false),
-                accentColor = o.optString("accentColor", "")
+                accentColor = o.optString("accentColor", ""),
+                generics = o.optJSONArray("generics")?.let { arr ->
+                    (0 until arr.length()).map {
+                        val g = arr.getJSONObject(it)
+                        GenericDevice(g.optString("name"), g.optString("url"), g.optString("method", "GET"), g.optString("body"))
+                    }
+                } ?: emptyList(),
+                latitude = o.optDouble("latitude", 52.52),
+                longitude = o.optDouble("longitude", 13.405)
             )
         }
     }

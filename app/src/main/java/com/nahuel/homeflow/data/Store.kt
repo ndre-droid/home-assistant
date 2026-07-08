@@ -21,9 +21,21 @@ object Store {
     private val _config = MutableStateFlow(Config())
     val config: StateFlow<Config> = _config
 
+    private val _history = MutableStateFlow<List<RunLog>>(emptyList())
+    val history: StateFlow<List<RunLog>> = _history
+    private lateinit var historyFile: File
+
     fun init(ctx: Context) {
         routinesFile = File(ctx.filesDir, "routines.json")
         configFile = File(ctx.filesDir, "config.json")
+        historyFile = File(ctx.filesDir, "history.json")
+        runCatching {
+            if (historyFile.exists()) {
+                val arr = JSONArray(historyFile.readText())
+                _history.value = (0 until arr.length()).map { val o = arr.getJSONObject(it)
+                    RunLog(o.optString("routineName"), o.optLong("timestamp"), o.optBoolean("ok"), o.optString("detail")) }
+            }
+        }
         runCatching {
             if (configFile.exists()) _config.value = Config.fromJson(JSONObject(configFile.readText()))
         }
@@ -70,6 +82,20 @@ object Store {
     }
 
     /** True while local time is inside [dayStart, nightStart). */
+    fun logRun(name: String, ok: Boolean, detail: String = "") {
+        val entry = RunLog(name, System.currentTimeMillis(), ok, detail)
+        _history.value = (listOf(entry) + _history.value).take(100)  // keep last 100
+        runCatching {
+            val arr = JSONArray()
+            _history.value.forEach { arr.put(JSONObject()
+                .put("routineName", it.routineName).put("timestamp", it.timestamp)
+                .put("ok", it.ok).put("detail", it.detail)) }
+            historyFile.writeText(arr.toString())
+        }
+    }
+
+    fun clearHistory() { _history.value = emptyList(); runCatching { historyFile.writeText("[]") } }
+
     fun isDaytime(): Boolean {
         val c = _config.value
         val now = java.util.Calendar.getInstance()
