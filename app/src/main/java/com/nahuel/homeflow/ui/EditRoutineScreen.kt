@@ -125,6 +125,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                                     TriggerType.NFC -> "NFC"
                                     TriggerType.DEVICE_STATE -> "Hue-Licht"
                                     TriggerType.LEAVE_WIFI -> "WLAN weg"
+                                    TriggerType.TIME -> "Uhrzeit"
+                                    TriggerType.SUN -> "Sonne"
                                 })
                             }
                         )
@@ -161,6 +163,28 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                         Spacer(Modifier.height(4.dp))
                         HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
                     }
+                    TriggerType.TIME -> {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = trg.time, onValueChange = { v -> upd { it.copy(time = v) } },
+                            label = { Text("Uhrzeit (HH:MM)") }, singleLine = true
+                        )
+                        HintText("Läuft täglich zu dieser Uhrzeit. (Hintergrund-Planung folgt; Auslöser wird gespeichert.)")
+                    }
+                    TriggerType.SUN -> {
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = trg.sunEvent == "SUNRISE",
+                                onClick = { upd { it.copy(sunEvent = "SUNRISE") } }, label = { Text("Sonnenaufgang") })
+                            FilterChip(selected = trg.sunEvent == "SUNSET",
+                                onClick = { upd { it.copy(sunEvent = "SUNSET") } }, label = { Text("Sonnenuntergang") })
+                        }
+                        OutlinedTextField(
+                            value = trg.sunOffsetMin.toString(),
+                            onValueChange = { v -> upd { it.copy(sunOffsetMin = v.toIntOrNull() ?: 0) } },
+                            label = { Text("Minuten davor (-) / danach (+)") }, singleLine = true
+                        )
+                    }
                     else -> {}
                 }
                 if (ti < triggers.lastIndex) HorizontalDivider(color = Hairline, modifier = Modifier.padding(top = 10.dp))
@@ -189,6 +213,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                             TriggerType.NFC -> "NFC-Tag"
                             TriggerType.DEVICE_STATE -> "Hue-Licht"
                             TriggerType.LEAVE_WIFI -> "WLAN verlassen"
+                            TriggerType.TIME -> "Uhrzeit ${t.time}"
+                            TriggerType.SUN -> if (t.sunEvent == "SUNRISE") "Sonnenaufgang" else "Sonnenuntergang"
                         }
                     },
                     color = TextPrim, fontSize = 13.sp
@@ -532,6 +558,10 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
             }
             "📺 $dev: $label"
         }
+        TargetType.GENERIC -> {
+            val dev = cfg.generics.firstOrNull { it.name == a.deviceId }?.name ?: a.deviceId
+            "🔗 $dev"
+        }
     }
 }
 
@@ -579,13 +609,14 @@ private fun ActionDialog(
                                     TargetType.HUE -> "all"
                                     TargetType.SONOS -> cfg.sonos.firstOrNull()?.ip ?: ""
                                     TargetType.LG_TV -> cfg.tvs.firstOrNull()?.ip ?: ""
+                                    TargetType.GENERIC -> cfg.generics.firstOrNull()?.name ?: ""
                                 }
                                 command = when (t) {
-                                    TargetType.HUE -> "set"; TargetType.SONOS -> "play"; TargetType.LG_TV -> "off"
+                                    TargetType.HUE -> "set"; TargetType.SONOS -> "play"; TargetType.LG_TV -> "off"; TargetType.GENERIC -> "fire"
                                 }
                             },
                             label = { Text(when (t) {
-                                TargetType.HUE -> "Hue"; TargetType.SONOS -> "Sonos"; TargetType.LG_TV -> "TV"
+                                TargetType.HUE -> "Hue"; TargetType.SONOS -> "Sonos"; TargetType.LG_TV -> "TV"; TargetType.GENERIC -> "HTTP"
                             }) }
                         )
                     }
@@ -597,6 +628,7 @@ private fun ActionDialog(
                         else hueLights.firstOrNull { it.id == deviceId }?.name ?: "wählen…"
                     TargetType.SONOS -> cfg.sonos.firstOrNull { it.ip == deviceId }?.name ?: "wählen…"
                     TargetType.LG_TV -> cfg.tvs.firstOrNull { it.ip == deviceId }?.name ?: "wählen…"
+                    TargetType.GENERIC -> cfg.generics.firstOrNull { it.name == deviceId }?.name ?: "wählen…"
                 }
                 Box {
                     OutlinedButton(onClick = { devOpen = true }) { Text(devLabel, color = TextPrim) }
@@ -621,6 +653,10 @@ private fun ActionDialog(
                             TargetType.LG_TV -> cfg.tvs.forEach { t ->
                                 DropdownMenuItem(text = { Text(t.name) },
                                     onClick = { deviceId = t.ip; devOpen = false })
+                            }
+                            TargetType.GENERIC -> cfg.generics.forEach { g ->
+                                DropdownMenuItem(text = { Text(g.name) },
+                                    onClick = { deviceId = g.name; devOpen = false })
                             }
                         }
                     }
@@ -735,6 +771,9 @@ private fun ActionDialog(
                             HintText("Leer = App öffnet normal. Mit YouTube-Link startet direkt das Video.")
                         }
                     }
+                    TargetType.GENERIC -> {
+                        HintText("Dieses Gerät sendet seine HTTP-Anfrage. Bearbeite URL/Methode im Geräte-Tab.")
+                    }
                 }
             }
         },
@@ -763,8 +802,13 @@ private fun ActionDialog(
                             if (cid.isNotEmpty()) params["contentId"] = cid
                         }
                     }
+                    TargetType.GENERIC -> { /* URL lives on the device; no per-action params */ }
                 }
-                val cmd = if (target == TargetType.HUE) "set" else command
+                val cmd = when (target) {
+                    TargetType.HUE -> "set"
+                    TargetType.GENERIC -> "fire"
+                    else -> command
+                }
                 onConfirm(Action(target, deviceId, cmd, params))
             }) { Text("OK", color = Violet) }
         },
