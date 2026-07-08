@@ -93,3 +93,22 @@ fun Modifier.pressScale(interaction: MutableInteractionSource): Modifier {
     )
     return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
+
+
+/**
+ * Brief "Gespeichert ✓" confirmation chip. Set [visible]=true to show it; it fades out on its own.
+ * Usage: hold a `var flash by remember { mutableStateOf(false) }`, set true on save, render SaveFlash(flash){ flash=false }.
+ */
+@Composable
+fun SaveFlash(visible: Boolean, onHide: () -> Unit) {
+    if (visible) {
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(1500); onHide()
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("✓", color = Green, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(6.dp))
+            Text("Gespeichert", color = Green, fontSize = 13.sp)
+        }
+    }
+}

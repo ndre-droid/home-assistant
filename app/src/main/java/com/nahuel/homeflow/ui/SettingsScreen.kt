@@ -30,6 +30,7 @@ import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.engine.TriggerService
+import kotlinx.coroutines.launch
 
 /** All fields auto-save on change — no separate save button to miss. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -37,6 +38,7 @@ import com.nahuel.homeflow.engine.TriggerService
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val config by Store.config.collectAsState()
     val ctx = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
     var editBias by remember { mutableStateOf(false) }
     var showAccentWheel by remember { mutableStateOf(false) }
@@ -239,6 +241,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 }
                 Spacer(Modifier.height(6.dp))
                 HintText("iPhone-Kamera auf den QR-Code halten, in Safari öffnen, zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button.")
+                Spacer(Modifier.height(8.dp))
+                Text("Nur im Heim-WLAN?", color = TextPrim, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                HintText("Diese Adresse funktioniert nur, wenn beide im selben WLAN sind und dein Handy an ist. Für dauerhaften Zugriff von überall: Tailscale (kostenlos) auf beiden Handys installieren, mit demselben Konto anmelden, dann diese Adresse durch die Tailscale-IP deines Handys ersetzen. Anleitung im Handbuch.")
             }
         }
 
@@ -265,7 +270,44 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             HintText("Handy kräftig schütteln, um diese Automation auszulösen (z. B. Panik-Aus). Der Hintergrunddienst muss laufen.")
 
             Spacer(Modifier.height(12.dp))
-            Text("Zuhause-Standort (für GPS-Trigger)", color = TextPrim, fontSize = 15.sp)
+            Text("Zuhause-Adresse (für GPS-Trigger)", color = TextPrim, fontSize = 15.sp)
+            var addr by remember { mutableStateOf("") }
+            var geoBusy by remember { mutableStateOf(false) }
+            var geoMsg by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = addr, onValueChange = { addr = it },
+                label = { Text("Adresse (Straße, Ort)") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+            Spacer(Modifier.height(6.dp))
+            Button(
+                onClick = {
+                    geoBusy = true; geoMsg = ""
+                    scope.launch {
+                        com.nahuel.homeflow.devices.Geocode.addressToCoords(ctx, addr)
+                            .onSuccess { (lat, lon) ->
+                                Store.updateConfig { it.copy(homeLat = lat, homeLon = lon) }
+                                geoMsg = "✓ Gespeichert: %.5f, %.5f".format(lat, lon)
+                            }
+                            .onFailure { geoMsg = "Nicht gefunden: ${it.message}. Nutze unten Koordinaten." }
+                        geoBusy = false
+                    }
+                },
+                enabled = !geoBusy && addr.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Violet),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (geoBusy) "Suche…" else "Adresse suchen & speichern", fontWeight = FontWeight.Medium) }
+            if (geoMsg.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(geoMsg, color = if (geoMsg.startsWith("✓")) Green else Pink, fontSize = 12.sp)
+            }
+            if (config.homeLat != 0.0) {
+                Spacer(Modifier.height(4.dp))
+                Text("Aktuell gespeichert: %.5f, %.5f".format(config.homeLat, config.homeLon),
+                    color = TextSec, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Oder Koordinaten direkt (aus Google Maps):", color = TextSec, fontSize = 12.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = if (config.homeLat == 0.0) "" else config.homeLat.toString(),
@@ -279,7 +321,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 )
             }
             Spacer(Modifier.height(4.dp))
-            HintText("Koordinaten aus Google Maps (lange auf dein Zuhause tippen). Danach Automationen mit Auslöser Ankunft/Weggehen (GPS) anlegen. Standort-Berechtigung auf immer erlauben stellen.")
+            HintText("Danach Automationen mit Auslöser Ankunft/Weggehen (GPS) anlegen. Standort-Berechtigung auf immer erlauben stellen.")
         }
 
         GradientCard {
