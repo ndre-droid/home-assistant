@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val cfg by Store.config.collectAsState()
-            HomeFlowTheme(themeMode = cfg.themeMode, dynamicColor = cfg.dynamicColor) {
+            HomeFlowTheme(themeMode = cfg.themeMode, dynamicColor = cfg.dynamicColor, accentHex = cfg.accentColor) {
                 AppRoot(
                     nfcWriteRoutineId = nfcWriteRoutineId.value,
                     onRequestNfcWrite = { nfcWriteRoutineId.value = it },

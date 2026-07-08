@@ -7,6 +7,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,12 +32,14 @@ import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.engine.TriggerService
 
 /** All fields auto-save on change — no separate save button to miss. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val config by Store.config.collectAsState()
     val ctx = LocalContext.current
     var hueLights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
     var editBias by remember { mutableStateOf(false) }
+    var showAccentWheel by remember { mutableStateOf(false) }
 
     LaunchedEffect(config.hueAppKey) {
         if (config.hueAppKey.isNotEmpty())
@@ -59,6 +71,36 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         )
                     ) { Text(label) }
                 }
+            }
+            Spacer(Modifier.height(14.dp))
+            Text("Akzentfarbe", color = TextSec, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            val presets = listOf(
+                "" to "Standard", "#3B6EF5" to "Blau", "#7C74E8" to "Violett",
+                "#1D9E75" to "Teal", "#E0A558" to "Amber", "#EC5F9E" to "Pink"
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                presets.forEach { (hex, name) ->
+                    val selected = config.accentColor == hex
+                    val swatch = if (hex.isEmpty()) Color(0xFF3B6EF5) else Color(android.graphics.Color.parseColor(hex))
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape).background(swatch)
+                            .border(
+                                width = if (selected) 3.dp else 0.5.dp,
+                                color = if (selected) TextPrim else Hairline,
+                                shape = CircleShape
+                            )
+                            .clickable { Store.updateConfig { it.copy(accentColor = hex) } }
+                    )
+                }
+                // Wheel option
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape)
+                        .background(Surface2)
+                        .border(0.5.dp, Hairline, CircleShape)
+                        .clickable { showAccentWheel = true },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Filled.Add, "Eigene Farbe", tint = TextSec, modifier = Modifier.size(18.dp)) }
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -192,5 +234,13 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             HintText("Für Geräte-Trigger und Bias-Light läuft ein Hintergrunddienst. Damit Samsung ihn nicht beendet: Einstellungen → Apps → HomeFlow → Akku → „Nicht optimiert\".")
         }
         Spacer(Modifier.height(24.dp))
+    }
+
+    if (showAccentWheel) {
+        ColorWheelDialog(
+            initialHex = config.accentColor.ifEmpty { null },
+            onDismiss = { showAccentWheel = false },
+            onPick = { hex -> Store.updateConfig { it.copy(accentColor = hex) } }
+        )
     }
 }

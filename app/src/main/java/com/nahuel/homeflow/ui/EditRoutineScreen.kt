@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
@@ -168,8 +171,30 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             }
         }
 
-        // ================= Entscheidungsbaum =================
-        SectionTitle("Ablauf  ·  von oben nach unten, erster passender Zweig gewinnt")
+        // ================= Flowchart / Entscheidungsbaum =================
+        SectionTitle("Flowchart  ·  Auslöser fließt von oben nach unten, erster passender Zweig gewinnt")
+        // Start node: the triggers feed into the branch flow below.
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Column(Modifier.width(20.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.padding(top = 16.dp).size(10.dp).clip(CircleShape).background(Violet))
+                Box(Modifier.padding(top = 4.dp).width(2.dp).weight(1f).background(Violet.copy(alpha = 0.5f)))
+            }
+            Spacer(Modifier.width(6.dp))
+            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                Text("START", color = Violet, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.2.sp)
+                Text(
+                    triggers.joinToString("  oder  ") { t ->
+                        when (t.type) {
+                            TriggerType.MANUAL -> "Button/Widget"
+                            TriggerType.NFC -> "NFC-Tag"
+                            TriggerType.DEVICE_STATE -> "Hue-Licht"
+                            TriggerType.LEAVE_WIFI -> "WLAN verlassen"
+                        }
+                    },
+                    color = TextPrim, fontSize = 13.sp
+                )
+            }
+        }
         branches.forEachIndexed { bi, br ->
             Row(Modifier.height(IntrinsicSize.Min)) {
                 // Baum-Schiene: Knoten + Linie
@@ -254,24 +279,11 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         ) {
-                            // Reorder handles (up/down) — simple, reliable, no gesture conflicts.
-                            Column {
-                                IconButton(
-                                    onClick = {
-                                        if (ai > 0) branches = branches.mapIndexed { i, v ->
-                                            if (i == bi) v.copy(actions = v.actions.swapAt(ai, ai - 1)) else v
-                                        }
-                                    },
-                                    enabled = ai > 0, modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = if (ai > 0) TextSec else Hairline) }
-                                IconButton(
-                                    onClick = {
-                                        if (ai < br.actions.lastIndex) branches = branches.mapIndexed { i, v ->
-                                            if (i == bi) v.copy(actions = v.actions.swapAt(ai, ai + 1)) else v
-                                        }
-                                    },
-                                    enabled = ai < br.actions.lastIndex, modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = if (ai < br.actions.lastIndex) TextSec else Hairline) }
+                            // Drag handle: drag up/down to reorder actions within the branch.
+                            ActionDragHandle(ai, br.actions.size) { from, to ->
+                                branches = branches.mapIndexed { i, v ->
+                                    if (i == bi) v.copy(actions = v.actions.moveAt(from, to)) else v
+                                }
                             }
                             Column(
                                 Modifier.weight(1f).clickable { actionDialog = bi to action }.padding(vertical = 4.dp)
@@ -353,9 +365,34 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     }
 }
 
-private fun <T> List<T>.swapAt(a: Int, b: Int): List<T> {
-    val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m
+@Composable
+private fun ActionDragHandle(index: Int, total: Int, onMove: (from: Int, to: Int) -> Unit) {
+    val stepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.toPx() }
+    var accum by remember(index) { mutableStateOf(0f) }
+    var cur by remember(index) { mutableStateOf(index) }
+    Icon(
+        Icons.Filled.Menu, contentDescription = "Ziehen zum Sortieren", tint = TextSec,
+        modifier = Modifier
+            .size(26.dp)
+            .pointerInput(index, total) {
+                detectDragGestures(
+                    onDragStart = { accum = 0f; cur = index },
+                    onDrag = { change, drag ->
+                        change.consume()
+                        accum += drag.y
+                        while (accum <= -stepPx && cur > 0) { onMove(cur, cur - 1); cur--; accum += stepPx }
+                        while (accum >= stepPx && cur < total - 1) { onMove(cur, cur + 1); cur++; accum -= stepPx }
+                    }
+                )
+            }
+    )
 }
+
+private fun <T> List<T>.moveAt(from: Int, to: Int): List<T> {
+    if (from == to || from !in indices || to !in indices) return this
+    val m = toMutableList(); val item = m.removeAt(from); m.add(to, item); return m
+}
+
 
 private fun List<Variant>.swap(a: Int, b: Int): List<Variant> {
     val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m

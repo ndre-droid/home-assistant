@@ -1,8 +1,19 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- lightning bolt in HomeFlow violet -->
+    <!-- HomeFlow: a flow/branch motif — one node splitting into two paths.
+         Uses the new committed blue accent. -->
+    <!-- connective paths -->
     <path
-        android:fillColor="#8B7CF7"
-        android:pathData="M58,26 L38,58 L52,58 L48,82 L70,48 L56,48 Z" />
+        android:strokeColor="#3B6EF5"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,40 L54,54 M54,54 C54,64 42,64 42,72 M54,54 C54,64 66,64 66,72" />
+    <!-- top node -->
+    <path android:fillColor="#5B8DEF" android:pathData="M54,32 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <!-- bottom-left node -->
+    <path android:fillColor="#3B6EF5" android:pathData="M42,76 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <!-- bottom-right node -->
+    <path android:fillColor="#7C74E8" android:pathData="M66,76 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
 </vector>

@@ -162,7 +162,8 @@ data class Config(
     val partnerIp: String = "",                  // partner phone IP for presence check
     val myPhoneIp: String = "",                  // your phone IP for leave-wifi detection
     val themeMode: ThemeMode = ThemeMode.SYSTEM, // appearance: follow system / light / dark
-    val dynamicColor: Boolean = false            // Material You wallpaper colors (Android 12+)
+    val dynamicColor: Boolean = false,           // Material You wallpaper colors (Android 12+)
+    val accentColor: String = ""                 // custom accent hex (#RRGGBB); empty = default blue
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -181,7 +182,7 @@ data class Config(
         put("biasLights", JSONArray().also { a -> biasLights.forEach { a.put(it) } })
         put("lightOrder", JSONArray().also { a -> lightOrder.forEach { a.put(it) } })
         put("partnerIp", partnerIp); put("myPhoneIp", myPhoneIp)
-        put("themeMode", themeMode.name); put("dynamicColor", dynamicColor)
+        put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
     }
 
     companion object {
@@ -220,7 +221,8 @@ data class Config(
                 partnerIp = o.optString("partnerIp", ""),
                 myPhoneIp = o.optString("myPhoneIp", ""),
                 themeMode = runCatching { ThemeMode.valueOf(o.optString("themeMode", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM),
-                dynamicColor = o.optBoolean("dynamicColor", false)
+                dynamicColor = o.optBoolean("dynamicColor", false),
+                accentColor = o.optString("accentColor", "")
             )
         }
     }

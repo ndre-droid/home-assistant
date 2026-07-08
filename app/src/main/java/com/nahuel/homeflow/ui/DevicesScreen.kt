@@ -349,7 +349,7 @@ private fun SonosRow(sp: SonosSpeaker, index: Int, total: Int, onStatus: (String
 
     Column(Modifier.padding(vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ReorderArrows(index, total) { from, to ->
+            DragHandle(index, total) { from, to ->
                 Store.updateConfig { it.copy(sonos = it.sonos.moveItem(from, to)) }
             }
             Text(sp.name, color = TextPrim, modifier = Modifier.weight(1f))
@@ -403,7 +403,7 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
             var editing by remember(tv.ip) { mutableStateOf(false) }
             var macEdit by remember(tv.ip) { mutableStateOf(tv.mac) }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
-                ReorderArrows(ti, config.tvs.size) { from, to ->
+                DragHandle(ti, config.tvs.size) { from, to ->
                     Store.updateConfig { it.copy(tvs = it.tvs.moveItem(from, to)) }
                 }
                 Column(Modifier.weight(1f)) {
@@ -487,33 +487,56 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         HintText("IP & MAC: TV → Einstellungen → Netzwerk → WLAN → Erweitert. „Einschalten über WLAN\" am TV aktivieren.")
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = {
                 if (ip.isNotBlank()) {
                     Store.updateConfig { it.copy(tvs = it.tvs + LgTv(name.trim(), ip.trim(), "", mac.trim())) }
+                    onStatus("TV \"${name.trim()}\" gespeichert. Jetzt koppeln (Zahnrad).")
                     ip = ""; mac = ""
-                }
+                } else onStatus("Bitte zuerst die IP eingeben.")
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Violet)
-        ) { Text("TV hinzufügen") }
+            colors = ButtonDefaults.buttonColors(containerColor = Violet),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("TV speichern", fontWeight = FontWeight.Medium) }
     }
 }
 
 
 /** Compact up/down reorder controls for a list item. */
 @Composable
-private fun ReorderArrows(index: Int, total: Int, onMove: (from: Int, to: Int) -> Unit) {
-    Column {
-        IconButton(
-            onClick = { if (index > 0) onMove(index, index - 1) },
-            enabled = index > 0, modifier = Modifier.size(22.dp)
-        ) { Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = if (index > 0) TextSec else Hairline) }
-        IconButton(
-            onClick = { if (index < total - 1) onMove(index, index + 1) },
-            enabled = index < total - 1, modifier = Modifier.size(22.dp)
-        ) { Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = if (index < total - 1) TextSec else Hairline) }
-    }
+/**
+ * Small drag handle. Drag it up/down; every ~44dp of travel moves the row one step.
+ * Reliable inside a scrolling column (no LazyColumn reorder gymnastics).
+ */
+@Composable
+private fun DragHandle(index: Int, total: Int, onMove: (from: Int, to: Int) -> Unit) {
+    val density = LocalDensity.current
+    val stepPx = with(density) { 44.dp.toPx() }
+    var accum by remember(index) { mutableStateOf(0f) }
+    var curIndex by remember(index) { mutableStateOf(index) }
+    Icon(
+        Icons.Filled.Menu, contentDescription = "Ziehen zum Sortieren", tint = TextSec,
+        modifier = Modifier
+            .size(28.dp)
+            .padding(end = 4.dp)
+            .pointerInput(index, total) {
+                detectDragGestures(
+                    onDragStart = { accum = 0f; curIndex = index },
+                    onDragEnd = { accum = 0f },
+                    onDrag = { change, drag ->
+                        change.consume()
+                        accum += drag.y
+                        while (accum <= -stepPx && curIndex > 0) {
+                            onMove(curIndex, curIndex - 1); curIndex--; accum += stepPx
+                        }
+                        while (accum >= stepPx && curIndex < total - 1) {
+                            onMove(curIndex, curIndex + 1); curIndex++; accum -= stepPx
+                        }
+                    }
+                )
+            }
+    )
 }
 
 private fun <T> List<T>.moveItem(from: Int, to: Int): List<T> {

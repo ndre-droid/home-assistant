@@ -87,6 +87,7 @@ val AccentGradient: Brush
 fun HomeFlowTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    accentHex: String = "",
     content: @Composable () -> Unit
 ) {
     val dark = when (themeMode) {
@@ -95,12 +96,18 @@ fun HomeFlowTheme(
         ThemeMode.DARK -> true
     }
     val ctx = LocalContext.current
-    val scheme = when {
+    val base = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         dark -> DarkScheme
         else -> LightScheme
     }
+    // Custom accent overrides primary when a valid hex is set and dynamic color is off.
+    val accent = runCatching {
+        if (accentHex.length == 7 && accentHex.startsWith("#") && !dynamicColor)
+            Color(android.graphics.Color.parseColor(accentHex)) else null
+    }.getOrNull()
+    val scheme = if (accent != null) base.copy(primary = accent, secondary = accent) else base
     MaterialTheme(
         colorScheme = scheme,
         shapes = Shapes(
