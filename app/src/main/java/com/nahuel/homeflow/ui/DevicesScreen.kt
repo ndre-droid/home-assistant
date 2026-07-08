@@ -126,18 +126,7 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
         SonosSection(config, onStatus = { status = it })
         TvSection(config, onStatus = { status = it })
 
-        // Placeholder for future smart-home integrations (Shelly, Matter, etc.)
-        GradientCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Add, contentDescription = null, tint = TextSec)
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Weitere Geräte", color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("Matter, Shelly, Zigbee & mehr, in Vorbereitung", color = TextSec, fontSize = 12.sp)
-                }
-                AssistChip(onClick = {}, enabled = false, label = { Text("Bald") })
-            }
-        }
+        GenericSection(config, onStatus = { status = it })
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -540,4 +529,68 @@ private fun DragHandle(index: Int, total: Int, onMove: (from: Int, to: Int) -> U
 private fun <T> List<T>.moveItem(from: Int, to: Int): List<T> {
     if (from == to || from !in indices || to !in indices) return this
     val m = toMutableList(); val item = m.removeAt(from); m.add(to, item); return m
+}
+
+
+/** User-defined HTTP/webhook devices (Shelly, Tasmota, Home Assistant, IFTTT...). */
+@Composable
+private fun GenericSection(config: Config, onStatus: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var post by remember { mutableStateOf(false) }
+    var body by remember { mutableStateOf("") }
+
+    CollapsibleSection(key = "generic", title = "Weitere Geräte (HTTP / Webhook)") {
+        config.generics.forEach { g ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(g.name, color = TextPrim)
+                    Text("${g.method}  ${g.url}", color = TextSec, fontSize = 11.sp, maxLines = 1)
+                }
+                TextButton(onClick = {
+                    scope.launch {
+                        com.nahuel.homeflow.devices.GenericClient.fire(g.url, g.method, g.body)
+                            .onSuccess { onStatus("${g.name}: OK") }
+                            .onFailure { onStatus("${g.name}: ${it.message}") }
+                    }
+                }) { Text("Test", color = Green, fontSize = 13.sp) }
+                IconButton(onClick = {
+                    Store.updateConfig { it.copy(generics = it.generics.filterNot { d -> d.name == g.name }) }
+                }) { Icon(Icons.Filled.Delete, "Entfernen", tint = TextSec) }
+            }
+        }
+        if (config.generics.isEmpty())
+            HintText("Beliebige Geräte per URL steuern: Shelly, Tasmota, Home Assistant, IFTTT. Trage Name und URL ein.")
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(value = name, onValueChange = { name = it },
+            label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(value = url, onValueChange = { url = it },
+            label = { Text("URL (http://...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilterChip(selected = !post, onClick = { post = false }, label = { Text("GET") })
+            Spacer(Modifier.width(8.dp))
+            FilterChip(selected = post, onClick = { post = true }, label = { Text("POST") })
+        }
+        if (post) {
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(value = body, onValueChange = { body = it },
+                label = { Text("Body (JSON, optional)") }, modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                if (name.isNotBlank() && url.isNotBlank()) {
+                    Store.updateConfig { it.copy(generics = it.generics +
+                        GenericDevice(name.trim(), url.trim(), if (post) "POST" else "GET", body.trim())) }
+                    onStatus("${name.trim()} gespeichert")
+                    name = ""; url = ""; body = ""
+                } else onStatus("Name und URL eingeben.")
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Violet),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Gerät speichern", fontWeight = FontWeight.Medium) }
+    }
 }

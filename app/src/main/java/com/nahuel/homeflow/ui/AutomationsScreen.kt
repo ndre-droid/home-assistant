@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,6 +29,8 @@ import com.nahuel.homeflow.engine.TriggerService
 @Composable
 fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, onCaptureScene: () -> Unit) {
     var showAddChooser = remember { androidx.compose.runtime.mutableStateOf(false) }
+    val showTemplates = remember { androidx.compose.runtime.mutableStateOf(false) }
+    val showHistory = remember { androidx.compose.runtime.mutableStateOf(false) }
     val routines by Store.routines.collectAsState()
     val ctx = LocalContext.current
 
@@ -37,7 +40,13 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                ScreenTitle("Automationen")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ScreenTitle("Automationen")
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { showHistory.value = true }) {
+                        Icon(Icons.Filled.Refresh, "Verlauf", tint = TextSec)
+                    }
+                }
             }
             if (routines.isEmpty()) {
                 item {
@@ -106,10 +115,67 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                         TextButton(onClick = { showAddChooser.value = false; onCaptureScene() }) {
                             Text("Szene aus aktuellem Zustand aufnehmen", color = Blue)
                         }
+                        TextButton(onClick = { showAddChooser.value = false; showTemplates.value = true }) {
+                            Text("Vorlage verwenden (Filmabend, Aufwachen, ...)", color = Green)
+                        }
                     }
                 },
                 confirmButton = {},
                 dismissButton = { TextButton(onClick = { showAddChooser.value = false }) { Text("Abbrechen", color = TextSec) } }
+            )
+        }
+
+        if (showTemplates.value) {
+            AlertDialog(
+                onDismissRequest = { showTemplates.value = false },
+                containerColor = Surface1,
+                title = { Text("Vorlage wählen", color = TextPrim) },
+                text = {
+                    Column {
+                        com.nahuel.homeflow.data.Templates.all.forEach { tpl ->
+                            TextButton(onClick = {
+                                Store.saveRoutine(tpl.build())
+                                showTemplates.value = false
+                            }) {
+                                Column {
+                                    Text(tpl.title, color = Violet, fontWeight = FontWeight.SemiBold)
+                                    Text(tpl.description, color = TextSec, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { showTemplates.value = false }) { Text("Schließen", color = TextSec) } }
+            )
+        }
+
+        if (showHistory.value) {
+            val history by Store.history.collectAsState()
+            AlertDialog(
+                onDismissRequest = { showHistory.value = false },
+                containerColor = Surface1,
+                title = { Text("Verlauf", color = TextPrim) },
+                text = {
+                    if (history.isEmpty()) Text("Noch nichts ausgeführt.", color = TextSec)
+                    else LazyColumn(Modifier.height(320.dp)) {
+                        items(history, key = { it.timestamp }) { h ->
+                            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (h.ok) "✓" else "✕", color = if (h.ok) Green else Pink, modifier = Modifier.width(20.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(h.routineName, color = TextPrim, fontSize = 14.sp)
+                                    Text(
+                                        android.text.format.DateFormat.format("dd.MM. HH:mm", h.timestamp).toString() +
+                                            (if (h.detail.isNotEmpty()) "  ,  ${h.detail}" else ""),
+                                        color = TextSec, fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { Store.clearHistory() }) { Text("Leeren", color = Pink) } },
+                dismissButton = { TextButton(onClick = { showHistory.value = false }) { Text("Schließen", color = TextSec) } }
             )
         }
     }
