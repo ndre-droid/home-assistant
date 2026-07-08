@@ -17,33 +17,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 // ---- Brand palette (used when dynamic color is off) ----
-private val BrandViolet = Color(0xFF8B7CF7)
-private val BrandBlue   = Color(0xFF3D8BFD)
-private val BrandPink   = Color(0xFFF062A6)
-private val BrandGreen  = Color(0xFF34D399)
+private val BrandBlue   = Color(0xFF3B6EF5)   // committed primary accent (direction C)
+private val BrandViolet = Color(0xFF7C74E8)   // secondary
+private val BrandPink   = Color(0xFFEC5F9E)
+private val BrandGreen  = Color(0xFF3DD68C)
 
 // Dark scheme (the app's original navy look, mapped to M3 roles)
 private val DarkScheme = darkColorScheme(
-    primary = BrandViolet,
+    primary = BrandBlue,
     onPrimary = Color.White,
-    secondary = BrandBlue,
+    secondary = BrandViolet,
     tertiary = BrandPink,
-    background = Color(0xFF0E1116),
-    onBackground = Color(0xFFF2F3F7),
-    surface = Color(0xFF161B26),
-    onSurface = Color(0xFFF2F3F7),
-    surfaceVariant = Color(0xFF1E2433),
-    onSurfaceVariant = Color(0xFF8A93A6),
-    outline = Color(0xFF222836),
-    outlineVariant = Color(0xFF222836),
-    error = Color(0xFFF87171)
+    background = Color(0xFF0B0D12),        // blue-tinted near-black, not pure
+    onBackground = Color(0xFFF4F6FB),
+    surface = Color(0xFF12151C),           // card surface, one step up
+    onSurface = Color(0xFFF4F6FB),
+    surfaceVariant = Color(0xFF171B24),    // raised controls, two steps up
+    onSurfaceVariant = Color(0xFF98A0B4),  // muted labels (passes contrast on tinted dark)
+    outline = Color(0xFF20242F),           // thin hairline
+    outlineVariant = Color(0xFF191D26),
+    error = Color(0xFFF26D6D)
 )
 
 // Light scheme
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFF6650E0),
+    primary = Color(0xFF2C5FE0),
     onPrimary = Color.White,
-    secondary = Color(0xFF2C6FD6),
+    secondary = Color(0xFF6650E0),
     tertiary = Color(0xFFC33C7E),
     background = Color(0xFFF7F7FB),
     onBackground = Color(0xFF1A1C22),
@@ -104,9 +104,9 @@ fun HomeFlowTheme(
     MaterialTheme(
         colorScheme = scheme,
         shapes = Shapes(
-            small = RoundedCornerShape(12.dp),
-            medium = RoundedCornerShape(18.dp),
-            large = RoundedCornerShape(24.dp)
+            small = RoundedCornerShape(10.dp),
+            medium = RoundedCornerShape(14.dp),
+            large = RoundedCornerShape(20.dp)
         ),
         content = content
     )
