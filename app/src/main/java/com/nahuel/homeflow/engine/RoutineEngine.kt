@@ -19,6 +19,13 @@ import kotlinx.coroutines.*
 object RoutineEngine {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // One running instance per routine. Starting again while running = STOP (toggle).
+    private val running = java.util.concurrent.ConcurrentHashMap<String, Job>()
+
+    private fun toast(ctx: Context, msg: String) {
+        Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show() }
+    }
+
     fun runAsync(ctx: Context, routineId: String) {
         val r = Store.routine(routineId) ?: return
         runAsync(ctx, r)
@@ -26,15 +33,25 @@ object RoutineEngine {
 
     fun runAsync(ctx: Context, routine: Routine) {
         val appCtx = ctx.applicationContext
-        scope.launch {
+        // Already running (wake-up fade, party, ...)? Second start stops it instead of stacking.
+        running[routine.id]?.let { job ->
+            if (job.isActive) {
+                job.cancel()
+                running.remove(routine.id)
+                Store.logRun(routine.name, true, "gestoppt")
+                toast(appCtx, "⏹ ${routine.name} gestoppt")
+                return
+            }
+        }
+        val job = scope.launch {
             val errors = run(routine)
             Store.logRun(routine.name, errors.isEmpty(), errors.firstOrNull() ?: "")
             val msg = if (errors.isEmpty()) "▶ ${routine.name}"
             else "${routine.name}: ${errors.size} Fehler, ${errors.first()}"
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show()
-            }
+            toast(appCtx, msg)
         }
+        running[routine.id] = job
+        job.invokeOnCompletion { running.remove(routine.id) }
     }
 
     /** Decision tree: branches are checked top-down, first branch whose conditions ALL match wins. */
@@ -57,18 +74,31 @@ object RoutineEngine {
         val errors = mutableListOf<String>()
         // Sequential: each action finishes before the next, so off-then-on works.
         for (action in variant.actions) {
-            execute(action).onFailure { errors += (it.message ?: "Unbekannter Fehler") }
+            currentCoroutineContext().ensureActive()
+            execute(action).onFailure {
+                if (it is CancellationException) throw it
+                errors += (it.message ?: "Unbekannter Fehler")
+            }
         }
         return errors
     }
 
-    /** Sunrise-style fade: deep red -> warm -> bright white over `minutes`. */
+    /** True if a specific light was switched off from outside (user intervened) - long-runners then stop. */
+    private suspend fun externallyOff(lightId: String): Boolean {
+        if (lightId == "all") return false
+        return HueClient.lights().getOrNull()?.firstOrNull { it.id == lightId }?.on == false
+    }
+
+    /** Sunrise-style fade: deep red -> warm -> bright white over `minutes`.
+     *  Aborts silently if cancelled or if the light gets turned off manually. */
     private suspend fun wakeUp(a: Action): Result<Unit> = runCatching {
         val minutes = a.params["minutes"]?.toIntOrNull()?.coerceIn(1, 60) ?: 20
         val steps = 20
         val stepMs = (minutes * 60_000L) / steps
         val colors = listOf("#3A0A0A", "#5A1A0A", "#8A3A10", "#B5651D", "#D9963C", "#F0C270", "#FFE8C0", "#FFFFFF")
         for (i in 0 until steps) {
+            currentCoroutineContext().ensureActive()
+            if (i > 0 && externallyOff(a.deviceId)) return@runCatching   // user turned it off - respect that
             val t = i.toFloat() / (steps - 1)
             val bri = (5 + t * 95).toInt()
             val color = colors[(t * (colors.size - 1)).toInt().coerceIn(0, colors.size - 1)]
@@ -91,7 +121,14 @@ object RoutineEngine {
         }
         val endAt = System.currentTimeMillis() + seconds * 1000L
         var i = 0
+        var lastExternCheck = 0L
         while (System.currentTimeMillis() < endAt) {
+            currentCoroutineContext().ensureActive()
+            val now = System.currentTimeMillis()
+            if (now - lastExternCheck > 2000) {
+                lastExternCheck = now
+                if (externallyOff(a.deviceId)) break   // user turned the light off - stop the party
+            }
             val c = colors[i % colors.size]
             // strobe: flash on/off by alternating a near-black "off" color
             val b = if (mode == "strobe" && c == "#000010") 1 else bri

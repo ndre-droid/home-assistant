@@ -26,6 +26,7 @@ import com.nahuel.homeflow.MainActivity
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.data.TriggerType
 import com.nahuel.homeflow.devices.HueClient
+import com.nahuel.homeflow.devices.HueEcho
 import com.nahuel.homeflow.devices.LgTvClient
 import kotlinx.coroutines.*
 import okhttp3.sse.EventSource
@@ -206,6 +207,7 @@ class TriggerService : Service() {
     }
 
     private fun onLightEvent(lightId: String, on: Boolean) {
+        if (HueEcho.recent(lightId)) return   // our own command echoing back - not a user action
         Store.routines.value
             .filter {
                 it.enabled && it.triggers.any { t ->

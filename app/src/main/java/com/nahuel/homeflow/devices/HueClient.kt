@@ -20,6 +20,15 @@ data class HueLight(
 )
 
 /** Philips Hue bridge, local CLIP v2 API. Latency on LAN: typically < 100 ms. */
+/** Remembers which lights WE just commanded, so the event stream can tell
+ *  our own echoes apart from real user actions (no self-retriggering loops). */
+object HueEcho {
+    private val m = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    fun mark(id: String) { m[id] = System.currentTimeMillis() }
+    fun recent(id: String, windowMs: Long = 2500): Boolean =
+        System.currentTimeMillis() - (m[id] ?: 0L) < windowMs
+}
+
 object HueClient {
     private val json = "application/json".toMediaType()
 
@@ -84,6 +93,7 @@ object HueClient {
                     }
                 }.toString().toRequestBody(json)
                 targets.forEach { t ->
+                    HueEcho.mark(t)
                     Http.local.newCall(v2("resource/light/$t").put(body).build()).execute().use { resp ->
                         check(resp.isSuccessful) { "Hue HTTP ${resp.code}" }
                     }
