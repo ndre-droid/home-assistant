@@ -123,7 +123,7 @@ object LgTvClient {
             val r = runCatching { session(ip, key, "ssap://system.launcher/launch", payload) }
             if (r.isSuccess) return@runCatching
             last = r.exceptionOrNull()
-            delay(3000L + attempt * 1000L)
+            delay(1200L + attempt * 800L)
         }
         throw IllegalStateException("App-Start fehlgeschlagen: ${last?.message}")
     }
@@ -133,15 +133,17 @@ object LgTvClient {
      * If the TV is off and a MAC is known, sends WoL first. Waits up to [maxWaitMs].
      */
     suspend fun ensureAwake(ip: String, key: String, mac: String, maxWaitMs: Long = 45_000): Result<Unit> {
+        // Fire WoL FIRST (harmless if the TV is already on) - saves the initial probe round-trip.
+        if (mac.isNotBlank()) powerOn(mac)
         if (getForegroundApp(ip, key).isSuccess) return Result.success(Unit)   // already awake
         if (mac.isBlank()) return Result.failure(IllegalStateException("TV ist aus und keine MAC-Adresse hinterlegt (Geräte-Tab)"))
-        powerOn(mac).onFailure { return Result.failure(it) }
         val deadline = System.currentTimeMillis() + maxWaitMs
+        var i = 0
         while (System.currentTimeMillis() < deadline) {
-            delay(3000)
-            powerOn(mac) // WoL packets can get lost - repeat while waiting
+            delay(1500)                       // tight polling: react the moment SSAP answers
+            if (i++ % 3 == 2) powerOn(mac)    // re-send WoL occasionally (packets get lost)
             if (getForegroundApp(ip, key).isSuccess) {
-                delay(2500)  // let the launcher settle after first successful call
+                delay(800)                    // brief settle, launcher is proven alive already
                 return Result.success(Unit)
             }
         }

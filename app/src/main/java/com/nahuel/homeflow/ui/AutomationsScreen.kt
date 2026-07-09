@@ -1,5 +1,9 @@
 package com.nahuel.homeflow.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -18,7 +22,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,12 +54,12 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
 
     Box(modifier.fillMaxSize().statusBarsPadding()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Fixed(1),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            item(span = { GridItemSpan(2) }) {
+            item(span = { GridItemSpan(1) }) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column {
@@ -72,7 +80,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 }
             }
             if (routines.isEmpty()) {
-                item(span = { GridItemSpan(2) }) {
+                item(span = { GridItemSpan(1) }) {
                     GradientCard {
                         Text("Noch keine Automationen", color = TextPrim, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
@@ -91,7 +99,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                     }
                 )
             }
-            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(88.dp)) }
+            item(span = { GridItemSpan(1) }) { Spacer(Modifier.height(88.dp)) }
         }
 
         ExtendedFloatingActionButton(
@@ -193,19 +201,32 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
 private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onToggle: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
+
+    // Start confirmation: tile flashes in the accent, icon pops, subtitle says it's running.
+    var runFlash by remember { mutableStateOf(false) }
+    val tileBg by animateColorAsState(
+        targetValue = if (runFlash) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f) else Surface1,
+        animationSpec = tween(220), label = "tileBg"
+    )
+    val iconScale by animateFloatAsState(
+        targetValue = if (runFlash) 1.3f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 500f), label = "iconPop"
+    )
+    LaunchedEffect(runFlash) { if (runFlash) { delay(1200); runFlash = false } }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(72.dp)
             .graphicsLayer { alpha = if (r.enabled) 1f else 0.45f }
             .clip(MaterialTheme.shapes.small)
-            .background(Surface1)
+            .background(tileBg)
             .pressScale(interaction)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = onRun,
+                onClick = { runFlash = true; onRun() },
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onToggle()
@@ -214,30 +235,42 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
     ) {
         // leading block, Spotify album-art slot
         Box(
-            Modifier.size(58.dp).background(Surface2),
+            Modifier.size(72.dp).background(Surface2),
             contentAlignment = Alignment.Center
         ) {
-            Text(triggerEmoji(r.triggers.firstOrNull()?.type), fontSize = 22.sp)
+            Text(
+                triggerEmoji(r.triggers.firstOrNull()?.type), fontSize = 28.sp,
+                modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }
+            )
         }
-        Text(
-            r.name,
-            color = TextPrim,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 16.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-        )
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(
+                r.name,
+                color = TextPrim,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                if (runFlash) "▶ Gestartet …"
+                else r.triggers.joinToString(" · ") { triggerLabel(it.type) },
+                color = if (runFlash) Violet else TextSec,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Text(
             "✎",
             color = TextSec,
-            fontSize = 14.sp,
+            fontSize = 16.sp,
             modifier = Modifier
-                .padding(end = 6.dp)
+                .padding(end = 8.dp)
                 .clip(MaterialTheme.shapes.small)
                 .bouncyClick(onEdit)
-                .padding(6.dp)
+                .padding(8.dp)
         )
     }
 }
