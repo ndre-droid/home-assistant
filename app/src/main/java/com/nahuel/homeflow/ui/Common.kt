@@ -39,9 +39,9 @@ import java.util.Calendar
 
 /** Bottom-bar icon, YouTube-style: outline normally, filled + gentle pop when selected. */
 @Composable
-fun TabIcon(ordinal: Int, selected: Boolean) {
+fun TabIcon(ordinal: Int, selected: Boolean, tint: androidx.compose.ui.graphics.Color) {
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.12f else 1f,
+        targetValue = if (selected) 1.1f else 1f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 800f),
         label = "tabScale"
     )
@@ -50,8 +50,38 @@ fun TabIcon(ordinal: Int, selected: Boolean) {
         1 -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
         else -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
     }
-    Icon(icon, contentDescription = null,
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale })
+    Icon(icon, contentDescription = null, tint = tint,
+        modifier = Modifier.size(24.dp).graphicsLayer { scaleX = scale; scaleY = scale })
+}
+
+/** Slim Spotify-style bottom bar: 54dp content row, hairline on top, springy taps. */
+@Composable
+fun SlimNavBar(labels: List<String>, current: Int, onSelect: (Int) -> Unit) {
+    Column(Modifier.background(Bg)) {
+        androidx.compose.material3.HorizontalDivider(color = Hairline, thickness = 0.5.dp)
+        Row(
+            Modifier.fillMaxWidth().height(54.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            labels.forEachIndexed { i, label ->
+                val selected = i == current
+                val tint = if (selected) TextPrim else TextSec
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.weight(1f).fillMaxHeight().bouncyClick { onSelect(i) }
+                ) {
+                    TabIcon(i, selected, tint)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        label, fontSize = 10.sp, color = tint,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+    }
 }
 
 /** Big bold screen title (Spotify weight). */

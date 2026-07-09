@@ -134,26 +134,11 @@ private fun AppRoot(
         Scaffold(
             containerColor = Bg,
             bottomBar = {
-                androidx.compose.foundation.layout.Column {
-                    HorizontalDivider(color = Hairline, thickness = 0.5.dp)
-                    NavigationBar(containerColor = Bg, tonalElevation = 0.dp) {
-                        Tab.entries.forEach { t ->
-                            NavigationBarItem(
-                                selected = tab == t,
-                                onClick = { tab = t },
-                                label = { Text(t.label, fontSize = 11.sp) },
-                                icon = { TabIcon(t.ordinal, tab == t) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = TextPrim,
-                                    selectedTextColor = TextPrim,
-                                    indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    unselectedIconColor = TextSec,
-                                    unselectedTextColor = TextSec
-                                )
-                            )
-                        }
-                    }
-                }
+                SlimNavBar(
+                    labels = Tab.entries.map { it.label },
+                    current = tab.ordinal,
+                    onSelect = { tab = Tab.entries[it] }
+                )
             }
         ) { pad ->
             val mod = Modifier.padding(pad)

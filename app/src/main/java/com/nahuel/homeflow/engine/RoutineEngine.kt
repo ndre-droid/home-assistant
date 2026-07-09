@@ -159,7 +159,7 @@ object RoutineEngine {
                     else LgTvClient.powerOnAndWait(tv.mac, tv.ip)
                 "volume" -> LgTvClient.setVolume(tv.ip, tv.clientKey, a.params["volume"]?.toIntOrNull() ?: 10)
                 "mute" -> LgTvClient.setMute(tv.ip, tv.clientKey, true)
-                "app" -> LgTvClient.launchApp(tv.ip, tv.clientKey, a.params["appId"].orEmpty(), a.params["contentId"])
+                "app" -> LgTvClient.openApp(tv.ip, tv.clientKey, tv.mac, a.params["appId"].orEmpty(), a.params["contentId"])
                 else -> Result.failure(IllegalArgumentException("TV: unbekanntes Kommando ${a.command}"))
             }
         }

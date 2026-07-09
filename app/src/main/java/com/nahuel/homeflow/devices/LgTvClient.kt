@@ -117,13 +117,41 @@ object LgTvClient {
         require(appId.isNotBlank()) { "Keine App gewählt" }
         val payload = JSONObject().put("id", appId)
         contentId?.takeIf { it.isNotBlank() }?.let { payload.put("contentId", it) }
-        // Retry once: right after a cold boot the first SSAP call can still miss.
-        val first = runCatching { session(ip, key, "ssap://system.launcher/launch", payload) }
-        if (first.isFailure) {
-            delay(2000)
-            session(ip, key, "ssap://system.launcher/launch", payload)
+        // Up to 4 attempts: right after a cold boot the launcher service lags behind the socket.
+        var last: Throwable? = null
+        repeat(4) { attempt ->
+            val r = runCatching { session(ip, key, "ssap://system.launcher/launch", payload) }
+            if (r.isSuccess) return@runCatching
+            last = r.exceptionOrNull()
+            delay(3000L + attempt * 1000L)
         }
-        Unit
+        throw IllegalStateException("App-Start fehlgeschlagen: ${last?.message}")
+    }
+
+    /**
+     * TRUE readiness: polls getForegroundAppInfo (the launcher itself), not just the socket.
+     * If the TV is off and a MAC is known, sends WoL first. Waits up to [maxWaitMs].
+     */
+    suspend fun ensureAwake(ip: String, key: String, mac: String, maxWaitMs: Long = 45_000): Result<Unit> {
+        if (getForegroundApp(ip, key).isSuccess) return Result.success(Unit)   // already awake
+        if (mac.isBlank()) return Result.failure(IllegalStateException("TV ist aus und keine MAC-Adresse hinterlegt (Geräte-Tab)"))
+        powerOn(mac).onFailure { return Result.failure(it) }
+        val deadline = System.currentTimeMillis() + maxWaitMs
+        while (System.currentTimeMillis() < deadline) {
+            delay(3000)
+            powerOn(mac) // WoL packets can get lost - repeat while waiting
+            if (getForegroundApp(ip, key).isSuccess) {
+                delay(2500)  // let the launcher settle after first successful call
+                return Result.success(Unit)
+            }
+        }
+        return Result.failure(IllegalStateException("TV nicht aufgewacht (45 s). Netzwerk-Standby am TV aktiv?"))
+    }
+
+    /** One command = wake TV if needed, then open the app (Netflix, YouTube-Video, ...). */
+    suspend fun openApp(ip: String, key: String, mac: String, appId: String, contentId: String?): Result<Unit> {
+        ensureAwake(ip, key, mac).onFailure { return Result.failure(it) }
+        return launchApp(ip, key, appId, contentId)
     }
 
     /** Foreground app id (netflix, youtube.leanback.v4, com.webos.app.hdmi2, ...). Fails fast if TV is off. */

@@ -1,10 +1,16 @@
 package com.nahuel.homeflow.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.History
@@ -12,14 +18,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nahuel.homeflow.data.Routine
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.data.TriggerType
 import com.nahuel.homeflow.engine.RoutineEngine
@@ -34,24 +45,34 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
     val ctx = LocalContext.current
 
     Box(modifier.fillMaxSize().statusBarsPadding()) {
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        ScreenTitle(greeting())
-                        Text("Deine Automationen", color = TextSec, fontSize = 13.sp)
+            item(span = { GridItemSpan(2) }) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            ScreenTitle(greeting())
+                            Text("Deine Automationen", color = TextSec, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { showHistory.value = true }) {
+                            Icon(Icons.Outlined.History, "Verlauf", tint = TextSec)
+                        }
                     }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { showHistory.value = true }) {
-                        Icon(Icons.Outlined.History, "Verlauf", tint = TextSec)
+                    if (routines.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Tippen = ausführen · Halten = an/aus · ✎ = bearbeiten",
+                            color = TextSec, fontSize = 11.sp)
                     }
+                    Spacer(Modifier.height(6.dp))
                 }
             }
             if (routines.isEmpty()) {
-                item {
+                item(span = { GridItemSpan(2) }) {
                     GradientCard {
                         Text("Noch keine Automationen", color = TextPrim, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
@@ -60,36 +81,17 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 }
             }
             items(routines, key = { it.id }) { r ->
-                val interaction = remember { MutableInteractionSource() }
-                GradientCard(
-                    Modifier
-                        .pressScale(interaction)
-                        .clickable(interaction, indication = null) { onEdit(r.id) }
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(r.name, color = TextPrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(2.dp))
-                            Text(r.triggers.joinToString(" · ") { triggerLabel(it.type) }, color = TextSec, fontSize = 12.sp)
-                        }
-                        // Run now — works regardless of enabled state
-                        PlayCircleButton(size = 38) { RoutineEngine.runAsync(ctx, r) }
-                        Spacer(Modifier.width(10.dp))
-                        Switch(
-                            checked = r.enabled,
-                            onCheckedChange = {
-                                Store.setEnabled(r.id, it)
-                                TriggerService.sync(ctx)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = Violet,
-                                uncheckedTrackColor = Surface2
-                            )
-                        )
+                RoutineTile(
+                    r = r,
+                    onRun = { RoutineEngine.runAsync(ctx, r) },
+                    onEdit = { onEdit(r.id) },
+                    onToggle = {
+                        Store.setEnabled(r.id, !r.enabled)
+                        TriggerService.sync(ctx)
                     }
-                }
+                )
             }
-            item { Spacer(Modifier.height(80.dp)) }
+            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(88.dp)) }
         }
 
         ExtendedFloatingActionButton(
@@ -167,7 +169,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                                     Text(h.routineName, color = TextPrim, fontSize = 14.sp)
                                     Text(
                                         android.text.format.DateFormat.format("dd.MM. HH:mm", h.timestamp).toString() +
-                                            (if (h.detail.isNotEmpty()) "  ,  ${h.detail}" else ""),
+                                            (if (h.detail.isNotEmpty()) "  ·  ${h.detail}" else ""),
                                         color = TextSec, fontSize = 11.sp
                                     )
                                 }
@@ -180,6 +182,75 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             )
         }
     }
+}
+
+/**
+ * Spotify-style tile: leading icon block, bold two-line name, edit pencil.
+ * Tap = run (like Spotify tap = play), long-press = enable/disable (dims when off).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onToggle: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .graphicsLayer { alpha = if (r.enabled) 1f else 0.45f }
+            .clip(MaterialTheme.shapes.small)
+            .background(Surface1)
+            .pressScale(interaction)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onRun,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggle()
+                }
+            )
+    ) {
+        // leading block, Spotify album-art slot
+        Box(
+            Modifier.size(58.dp).background(Surface2),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(triggerEmoji(r.triggers.firstOrNull()?.type), fontSize = 22.sp)
+        }
+        Text(
+            r.name,
+            color = TextPrim,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 16.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+        )
+        Text(
+            "✎",
+            color = TextSec,
+            fontSize = 14.sp,
+            modifier = Modifier
+                .padding(end = 6.dp)
+                .clip(MaterialTheme.shapes.small)
+                .bouncyClick(onEdit)
+                .padding(6.dp)
+        )
+    }
+}
+
+fun triggerEmoji(t: TriggerType?): String = when (t) {
+    TriggerType.NFC -> "🏷️"
+    TriggerType.DEVICE_STATE -> "💡"
+    TriggerType.LEAVE_WIFI -> "📡"
+    TriggerType.TIME -> "⏰"
+    TriggerType.SUN -> "🌅"
+    TriggerType.ARRIVE_HOME -> "🏠"
+    TriggerType.LEAVE_HOME -> "🚪"
+    else -> "▶️"
 }
 
 fun triggerLabel(t: TriggerType): String = when (t) {
