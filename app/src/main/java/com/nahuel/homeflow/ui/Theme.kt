@@ -16,64 +16,61 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-// ---- Brand palette (used when dynamic color is off) ----
-private val BrandBlue   = Color(0xFF3B6EF5)   // committed primary accent (direction C)
-private val BrandViolet = Color(0xFF7C74E8)   // secondary
-private val BrandPink   = Color(0xFFEC5F9E)
-private val BrandGreen  = Color(0xFF3DD68C)
+// ---- Brand palette: Spotify/YouTube language ----
+// Neutral near-black canvas, ONE saturated accent, gray steps for everything else.
+private val AccentGreen  = Color(0xFF1ED760)   // default accent (changeable in settings)
+private val BrandPink    = Color(0xFFF2649E)
+private val BrandGreenOk = Color(0xFF1ED760)
 
-// Dark scheme (the app's original navy look, mapped to M3 roles)
+// Dark: YouTube's pure near-black + Spotify's gray steps. No blue tint, no borders.
 private val DarkScheme = darkColorScheme(
-    primary = BrandBlue,
-    onPrimary = Color.White,
-    secondary = BrandViolet,
+    primary = AccentGreen,
+    onPrimary = Color(0xFF0D0D0D),         // black-on-green, like Spotify's play button
+    secondary = AccentGreen,
     tertiary = BrandPink,
-    background = Color(0xFF0B0D12),        // blue-tinted near-black, not pure
-    onBackground = Color(0xFFF4F6FB),
-    surface = Color(0xFF12151C),           // card surface, one step up
-    onSurface = Color(0xFFF4F6FB),
-    surfaceVariant = Color(0xFF171B24),    // raised controls, two steps up
-    onSurfaceVariant = Color(0xFF98A0B4),  // muted labels (passes contrast on tinted dark)
-    outline = Color(0xFF20242F),           // thin hairline
-    outlineVariant = Color(0xFF191D26),
+    background = Color(0xFF0F0F0F),
+    onBackground = Color(0xFFF1F1F1),
+    surface = Color(0xFF1B1B1B),           // card step
+    onSurface = Color(0xFFF1F1F1),
+    surfaceVariant = Color(0xFF272727),    // chip/control step (YouTube chip gray)
+    onSurfaceVariant = Color(0xFFAAAAAA),  // muted text
+    outline = Color(0xFF2A2A2A),
+    outlineVariant = Color(0xFF232323),
     error = Color(0xFFF26D6D)
 )
 
-// Light scheme
+// Light: YouTube light — white canvas, gray chips, near-black text, deep green accent.
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFF2C5FE0),
+    primary = Color(0xFF12833B),
     onPrimary = Color.White,
-    secondary = Color(0xFF6650E0),
+    secondary = Color(0xFF12833B),
     tertiary = Color(0xFFC33C7E),
-    background = Color(0xFFF7F7FB),
-    onBackground = Color(0xFF1A1C22),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1A1C22),
-    surfaceVariant = Color(0xFFEDEEF3),
-    onSurfaceVariant = Color(0xFF5A6072),
-    outline = Color(0xFFE0E2EA),
-    outlineVariant = Color(0xFFE8EAF1),
-    error = Color(0xFFD1443B)
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF0F0F0F),
+    surface = Color(0xFFF2F2F2),
+    onSurface = Color(0xFF0F0F0F),
+    surfaceVariant = Color(0xFFE5E5E5),
+    onSurfaceVariant = Color(0xFF606060),
+    outline = Color(0xFFDDDDDD),
+    outlineVariant = Color(0xFFE8E8E8),
+    error = Color(0xFFCC3D33)
 )
 
 /** Theme mode preference. Stored in Config.themeMode. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-// ---- Backward-compatible color tokens: now theme-aware ----
-// Every screen still writes `Violet`, `TextPrim`, etc. — these now resolve
-// from the active MaterialTheme colorScheme, so light/dark + dynamic all work.
+// ---- Theme-aware tokens (all screens reference these) ----
 val Bg: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background
 val Surface1: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surface
 val Surface2: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceVariant
 val Violet: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primary
 val Blue: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondary
 val Pink: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.tertiary
-val Green: Color @Composable @ReadOnlyComposable get() = BrandGreen
+val Green: Color @Composable @ReadOnlyComposable get() = BrandGreenOk
 val TextPrim: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurface
 val TextSec: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val Hairline: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline
 
-// Finer, flatter card fill — a subtle two-stop that reads as one clean surface.
 val CardGradient: Brush
     @Composable @ReadOnlyComposable get() {
         val s = MaterialTheme.colorScheme.surface
@@ -102,19 +99,27 @@ fun HomeFlowTheme(
         dark -> DarkScheme
         else -> LightScheme
     }
-    // Custom accent overrides primary when a valid hex is set and dynamic color is off.
+    // Custom accent (settings picker) overrides primary when dynamic color is off.
     val accent = runCatching {
         if (accentHex.length == 7 && accentHex.startsWith("#") && !dynamicColor)
             Color(android.graphics.Color.parseColor(accentHex)) else null
     }.getOrNull()
-    val scheme = if (accent != null) base.copy(primary = accent, secondary = accent) else base
+    val scheme = if (accent != null) base.copy(
+        primary = accent,
+        secondary = accent,
+        // keep icon/text on the accent readable for light accents
+        onPrimary = if (accentIsLight(accent)) Color(0xFF0D0D0D) else Color.White
+    ) else base
     MaterialTheme(
         colorScheme = scheme,
         shapes = Shapes(
-            small = RoundedCornerShape(10.dp),
-            medium = RoundedCornerShape(14.dp),
-            large = RoundedCornerShape(20.dp)
+            small = RoundedCornerShape(8.dp),
+            medium = RoundedCornerShape(12.dp),
+            large = RoundedCornerShape(16.dp)
         ),
         content = content
     )
 }
+
+private fun accentIsLight(c: Color): Boolean =
+    (0.299f * c.red + 0.587f * c.green + 0.114f * c.blue) > 0.6f

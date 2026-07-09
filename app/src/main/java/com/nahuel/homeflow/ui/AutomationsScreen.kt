@@ -7,8 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,7 +27,7 @@ import com.nahuel.homeflow.engine.TriggerService
 
 @Composable
 fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, onCaptureScene: () -> Unit) {
-    var showAddChooser = remember { androidx.compose.runtime.mutableStateOf(false) }
+    val showAddChooser = remember { androidx.compose.runtime.mutableStateOf(false) }
     val showTemplates = remember { androidx.compose.runtime.mutableStateOf(false) }
     val showHistory = remember { androidx.compose.runtime.mutableStateOf(false) }
     val routines by Store.routines.collectAsState()
@@ -41,10 +40,13 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScreenTitle("Automationen")
+                    Column {
+                        ScreenTitle(greeting())
+                        Text("Deine Automationen", color = TextSec, fontSize = 13.sp)
+                    }
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { showHistory.value = true }) {
-                        Icon(Icons.Filled.Refresh, "Verlauf", tint = TextSec)
+                        Icon(Icons.Outlined.History, "Verlauf", tint = TextSec)
                     }
                 }
             }
@@ -71,9 +73,8 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                             Text(r.triggers.joinToString(" · ") { triggerLabel(it.type) }, color = TextSec, fontSize = 12.sp)
                         }
                         // Run now — works regardless of enabled state
-                        IconButton(onClick = { RoutineEngine.runAsync(ctx, r) }) {
-                            Icon(Icons.Filled.PlayArrow, "Jetzt ausführen", tint = Violet)
-                        }
+                        PlayCircleButton(size = 38) { RoutineEngine.runAsync(ctx, r) }
+                        Spacer(Modifier.width(10.dp))
                         Switch(
                             checked = r.enabled,
                             onCheckedChange = {
@@ -94,7 +95,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
         ExtendedFloatingActionButton(
             onClick = { showAddChooser.value = true },
             containerColor = Violet,
-            contentColor = androidx.compose.ui.graphics.Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
             text = { Text("Neu") },
             modifier = Modifier

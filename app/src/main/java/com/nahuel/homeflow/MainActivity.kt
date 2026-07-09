@@ -18,6 +18,8 @@ import androidx.compose.runtime.getValue
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.ui.HomeFlowTheme
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -132,21 +134,24 @@ private fun AppRoot(
         Scaffold(
             containerColor = Bg,
             bottomBar = {
-                NavigationBar(containerColor = Surface1) {
-                    Tab.entries.forEach { t ->
-                        NavigationBarItem(
-                            selected = tab == t,
-                            onClick = { tab = t },
-                            label = { Text(t.label) },
-                            icon = { TabIcon(t.ordinal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Violet,
-                                selectedTextColor = Violet,
-                                indicatorColor = Surface2,
-                                unselectedIconColor = TextSec,
-                                unselectedTextColor = TextSec
+                androidx.compose.foundation.layout.Column {
+                    HorizontalDivider(color = Hairline, thickness = 0.5.dp)
+                    NavigationBar(containerColor = Bg, tonalElevation = 0.dp) {
+                        Tab.entries.forEach { t ->
+                            NavigationBarItem(
+                                selected = tab == t,
+                                onClick = { tab = t },
+                                label = { Text(t.label, fontSize = 11.sp) },
+                                icon = { TabIcon(t.ordinal, tab == t) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = TextPrim,
+                                    selectedTextColor = TextPrim,
+                                    indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unselectedIconColor = TextSec,
+                                    unselectedTextColor = TextSec
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
