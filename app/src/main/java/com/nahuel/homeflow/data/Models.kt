@@ -117,7 +117,8 @@ data class Routine(
     val name: String = "",
     val enabled: Boolean = true,
     val triggers: List<Trigger> = listOf(Trigger()),
-    val variants: List<Variant> = emptyList()
+    val variants: List<Variant> = emptyList(),
+    val icon: String = ""            // chosen emoji; empty = auto-suggest
 ) {
     /** Backward-compat: first trigger. Old call sites keep working. */
     val trigger: Trigger get() = triggers.firstOrNull() ?: Trigger()
@@ -126,6 +127,7 @@ data class Routine(
         .put("id", id).put("name", name).put("enabled", enabled)
         .put("triggers", JSONArray().also { a -> triggers.forEach { a.put(it.toJson()) } })
         .put("variants", JSONArray().also { a -> variants.forEach { a.put(it.toJson()) } })
+        .put("icon", icon)
 
     companion object {
         fun fromJson(o: JSONObject): Routine {
@@ -143,7 +145,8 @@ data class Routine(
                 name = o.optString("name", "Unbenannt"),
                 enabled = o.optBoolean("enabled", true),
                 triggers = trigs,
-                variants = vars
+                variants = vars,
+                icon = o.optString("icon", "")
             )
         }
     }

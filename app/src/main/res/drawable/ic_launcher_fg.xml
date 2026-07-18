@@ -1,19 +1,11 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- HomeFlow: a flow/branch motif — one node splitting into two paths.
-         Uses the new committed blue accent. -->
-    <!-- connective paths -->
+    <!-- minimal mark: accent circle with play glyph -->
     <path
-        android:strokeColor="#3B6EF5"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
         android:fillColor="#1ED760"
-        android:pathData="M54,40 L54,54 M54,54 C54,64 42,64 42,72 M54,54 C54,64 66,64 66,72" />
-    <!-- top node -->
-    <path android:fillColor="#1ED760" android:pathData="M54,32 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
-    <!-- bottom-left node -->
-    <path android:fillColor="#1ED760" android:pathData="M42,76 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
-    <!-- bottom-right node -->
-    <path android:fillColor="#1ED760" android:pathData="M66,76 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+        android:pathData="M54,33 A21,21 0 1 1 53.98,33 Z" />
+    <path
+        android:fillColor="#0F0F0F"
+        android:pathData="M49,45.5 L63,54 L49,62.5 Z" />
 </vector>

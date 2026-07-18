@@ -48,6 +48,7 @@ object SonosClient {
                 val body = resp.body?.string() ?: ""
                 check(resp.isSuccessful) {
                     when (Regex("<errorCode>(\\d+)</errorCode>").find(body)?.groupValues?.get(1)) {
+                        "714" -> "Sonos kann diese URL nicht abspielen (keine direkte Audio-Datei/Stream). Nutze die 🔍-Suche oder eine MP3-/Radio-URL."
                         "701" -> "Keine Wiedergabequelle. Erst in der Sonos-App etwas abspielen (dann klappt Play/Pause) oder in der Automation \"Sound-URL\" verwenden."
                         "402" -> "Ungültige Parameter (UPnP 402)"
                         null -> "Sonos HTTP ${resp.code}"
@@ -90,12 +91,30 @@ object SonosClient {
         ); Unit
     }
 
+    /** .m3u/.pls playlists point AT the stream - fetch and use the first real URL inside. */
+    private suspend fun resolvePlaylist(uri: String): String = withContext(Dispatchers.IO) {
+        val plain = uri.substringBefore('?').lowercase()
+        if (!plain.endsWith(".m3u") && !plain.endsWith(".pls")) return@withContext uri
+        runCatching {
+            Http.internet.newCall(Request.Builder().url(uri).get().build()).execute().use { r ->
+                r.body?.string().orEmpty().lineSequence()
+                    .map { it.trim() }
+                    .map { if (it.startsWith("File", ignoreCase = true)) it.substringAfter('=').trim() else it }
+                    .firstOrNull { it.startsWith("http") } ?: uri
+            }
+        }.getOrDefault(uri)
+    }
+
     /** Sets a stream/file URI and starts playback. meta = plain DIDL-Lite XML (optional, from capture). */
     suspend fun playUri(ip: String, uri: String, volume: Int?, meta: String = ""): Result<Unit> = runCatching {
+        val real = resolvePlaylist(uri)
+        require(!real.substringBefore('?').lowercase().endsWith(".m3u8")) {
+            "HLS-Stream (.m3u8) - kann Sonos nicht direkt abspielen. Nimm einen MP3/AAC-Stream (🔍-Suche)."
+        }
         volume?.let { setVolume(ip, it).getOrThrow() }
         soap(
             ip, "AVTransport", "SetAVTransportURI",
-            "<InstanceID>0</InstanceID><CurrentURI>${esc(uri)}</CurrentURI><CurrentURIMetaData>${esc(meta)}</CurrentURIMetaData>"
+            "<InstanceID>0</InstanceID><CurrentURI>${esc(real)}</CurrentURI><CurrentURIMetaData>${esc(meta)}</CurrentURIMetaData>"
         )
         soap(ip, "AVTransport", "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit
     }

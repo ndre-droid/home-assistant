@@ -26,12 +26,16 @@ object RadioBrowser {
                 val arr = JSONArray(resp.body!!.string())
                 (0 until arr.length()).map { i ->
                     val s = arr.getJSONObject(i)
+                    if (s.optInt("hls", 0) == 1) return@map Station("", "", "")
                     Station(
                         name = s.optString("name").trim(),
                         url = s.optString("url_resolved").ifEmpty { s.optString("url") },
                         tags = s.optString("tags")
                     )
-                }.filter { it.url.isNotBlank() && it.name.isNotBlank() }
+                }.filter {
+                    it.url.isNotBlank() && it.name.isNotBlank() &&
+                            !it.url.substringBefore('?').lowercase().endsWith(".m3u8")
+                }
             }
         }
     }

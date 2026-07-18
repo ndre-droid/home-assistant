@@ -48,6 +48,8 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
 
     var draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
+    var icon by remember { mutableStateOf(existing?.icon ?: "") }
+    var showIconPicker by remember { mutableStateOf(false) }
     var enabled by remember { mutableStateOf(existing?.enabled ?: true) }
     var triggers by remember { mutableStateOf(existing?.triggers ?: listOf(Trigger())) }
     var branches by remember { mutableStateOf(existing?.variants ?: listOf(Variant())) }
@@ -64,7 +66,7 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     }
 
     fun save(): Routine {
-        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, triggers, branches)
+        val r = Routine(draftId, name.ifBlank { "Unbenannt" }, enabled, triggers, branches, icon)
         Store.saveRoutine(r)
         TriggerService.sync(ctx)
         return r
@@ -95,12 +97,28 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         }
 
         GradientCard {
-            SectionTitle("Name")
-            OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                placeholder = { Text("z. B. Badlicht-Sound") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
-            )
+            SectionTitle("Name & Icon")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(Surface2)
+                        .bouncyClick { showIconPicker = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(icon.ifEmpty { suggestIcon(name) ?: "▶️" }, fontSize = 22.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    placeholder = { Text("z. B. Badlicht-Sound") },
+                    modifier = Modifier.weight(1f), singleLine = true
+                )
+            }
+            TextButton(onClick = { showIconPicker = true }, contentPadding = PaddingValues(0.dp)) {
+                Text("Icon ändern", color = Blue, fontSize = 13.sp)
+            }
         }
 
         GradientCard {
@@ -368,6 +386,14 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         Spacer(Modifier.height(24.dp))
     }
 
+    if (showIconPicker) {
+        IconPickerDialog(
+            suggestion = suggestIcon(name),
+            onDismiss = { showIconPicker = false },
+            onPick = { icon = it }
+        )
+    }
+
     condDialogFor?.let { bi ->
         CondDialog(
             onDismiss = { condDialogFor = null },
@@ -625,44 +651,24 @@ private fun ActionDialog(
                         )
                     }
                 }
-
-                var devOpen by remember { mutableStateOf(false) }
-                val devLabel = when (target) {
-                    TargetType.HUE -> if (deviceId == "all") "Alle Lampen"
-                        else hueLights.firstOrNull { it.id == deviceId }?.name ?: "wählen…"
-                    TargetType.SONOS -> cfg.sonos.firstOrNull { it.ip == deviceId }?.name ?: "wählen…"
-                    TargetType.LG_TV -> cfg.tvs.firstOrNull { it.ip == deviceId }?.name ?: "wählen…"
-                    TargetType.GENERIC -> cfg.generics.firstOrNull { it.name == deviceId }?.name ?: "wählen…"
+                // Device picker: horizontal chip rail (Spotify device-picker feel)
+                val devices: List<Pair<String, String>> = when (target) {
+                    TargetType.HUE -> listOf("all" to "💡 Alle Lampen") + hueLights.map { it.id to "💡 ${it.name}" }
+                    TargetType.SONOS -> listOf("all" to "🔊 Alle Speaker") + cfg.sonos.map { it.ip to "🔊 ${it.name}" }
+                    TargetType.LG_TV -> cfg.tvs.map { it.ip to "📺 ${it.name}" }
+                    TargetType.GENERIC -> cfg.generics.map { it.name to "🔌 ${it.name}" }
                 }
-                Box {
-                    OutlinedButton(onClick = { devOpen = true }) { Text(devLabel, color = TextPrim) }
-                    DropdownMenu(expanded = devOpen, onDismissRequest = { devOpen = false }) {
-                        when (target) {
-                            TargetType.HUE -> {
-                                DropdownMenuItem(text = { Text("Alle Lampen") },
-                                    onClick = { deviceId = "all"; devOpen = false })
-                                hueLights.forEach { l ->
-                                    DropdownMenuItem(text = { Text(l.name) },
-                                        onClick = { deviceId = l.id; devOpen = false })
-                                }
-                            }
-                            TargetType.SONOS -> {
-                                DropdownMenuItem(text = { Text("Alle Speaker") },
-                                    onClick = { deviceId = "all"; devOpen = false })
-                                cfg.sonos.forEach { s ->
-                                    DropdownMenuItem(text = { Text(s.name) },
-                                        onClick = { deviceId = s.ip; devOpen = false })
-                                }
-                            }
-                            TargetType.LG_TV -> cfg.tvs.forEach { t ->
-                                DropdownMenuItem(text = { Text(t.name) },
-                                    onClick = { deviceId = t.ip; devOpen = false })
-                            }
-                            TargetType.GENERIC -> cfg.generics.forEach { g ->
-                                DropdownMenuItem(text = { Text(g.name) },
-                                    onClick = { deviceId = g.name; devOpen = false })
-                            }
-                        }
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(devices.size) { di ->
+                        val (id, label) = devices[di]
+                        FilterChip(
+                            selected = deviceId == id,
+                            onClick = { deviceId = id },
+                            label = { Text(label) },
+                            shape = CircleShape
+                        )
                     }
                 }
 

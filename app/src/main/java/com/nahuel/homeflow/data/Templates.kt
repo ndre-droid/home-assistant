@@ -59,6 +59,43 @@ object Templates {
                 )))
             )
         },
+        Template("Fokus", "Helles Neutralweiß zum Arbeiten") {
+            Routine(
+                name = "Fokus",
+                triggers = listOf(Trigger(TriggerType.MANUAL)),
+                variants = listOf(Variant(actions = listOf(
+                    Action(TargetType.HUE, "all", "set", mapOf("on" to "true", "brightness" to "100", "color" to "#FFE8C0"))
+                )))
+            )
+        },
+        Template("Romantik", "Warmes, gedimmtes Licht") {
+            Routine(
+                name = "Romantik",
+                triggers = listOf(Trigger(TriggerType.MANUAL)),
+                variants = listOf(Variant(actions = listOf(
+                    Action(TargetType.HUE, "all", "set", mapOf("on" to "true", "brightness" to "22", "color" to "#FF6B6B"))
+                )))
+            )
+        },
+        Template("Gäste kommen", "Freundlich hell, warmweiß") {
+            Routine(
+                name = "Gäste kommen",
+                triggers = listOf(Trigger(TriggerType.MANUAL)),
+                variants = listOf(Variant(actions = listOf(
+                    Action(TargetType.HUE, "all", "set", mapOf("on" to "true", "brightness" to "80", "color" to "#FFD9A0"))
+                )))
+            )
+        },
+        Template("Schlummerlicht", "Licht geht nach 15 Min von selbst aus") {
+            Routine(
+                name = "Schlummerlicht",
+                triggers = listOf(Trigger(TriggerType.MANUAL)),
+                variants = listOf(Variant(actions = listOf(
+                    Action(TargetType.HUE, "all", "set", mapOf("on" to "true", "brightness" to "15", "color" to "#FF8C42")),
+                    Action(TargetType.HUE, "all", "countdown_off", mapOf("minutes" to "15"))
+                )))
+            )
+        },
         Template("Verlassen", "Alles aus beim Gehen (WLAN verlassen)") {
             Routine(
                 name = "Verlassen",

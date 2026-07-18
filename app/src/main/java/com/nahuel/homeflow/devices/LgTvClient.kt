@@ -140,10 +140,10 @@ object LgTvClient {
         val deadline = System.currentTimeMillis() + maxWaitMs
         var i = 0
         while (System.currentTimeMillis() < deadline) {
-            delay(1500)                       // tight polling: react the moment SSAP answers
+            delay(1000)                       // tight polling: react the moment SSAP answers
             if (i++ % 3 == 2) powerOn(mac)    // re-send WoL occasionally (packets get lost)
             if (getForegroundApp(ip, key).isSuccess) {
-                delay(800)                    // brief settle, launcher is proven alive already
+                delay(500)                    // brief settle, launcher is proven alive already
                 return Result.success(Unit)
             }
         }

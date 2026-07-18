@@ -66,6 +66,15 @@ object Store {
         _routines.value.firstOrNull { it.id == id }?.let { saveRoutine(it.copy(enabled = enabled)) }
     }
 
+    @Synchronized
+    fun moveRoutine(from: Int, to: Int) {
+        val l = _routines.value.toMutableList()
+        if (from !in l.indices || to !in l.indices || from == to) return
+        val item = l.removeAt(from); l.add(to, item)
+        _routines.value = l
+        persistRoutines()
+    }
+
     fun routine(id: String): Routine? = _routines.value.firstOrNull { it.id == id }
 
     @Synchronized

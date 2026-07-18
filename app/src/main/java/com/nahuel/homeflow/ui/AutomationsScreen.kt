@@ -7,6 +7,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,8 +20,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -51,6 +58,10 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
     val showHistory = remember { androidx.compose.runtime.mutableStateOf(false) }
     val routines by Store.routines.collectAsState()
     val ctx = LocalContext.current
+    var sortMode by remember { mutableStateOf(false) }
+    var dragIndex by remember { mutableStateOf(-1) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    val rowStepPx = with(LocalDensity.current) { 70.dp.toPx() }
 
     Box(modifier.fillMaxSize().statusBarsPadding()) {
         LazyVerticalGrid(
@@ -67,14 +78,22 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                             Text("Deine Automationen", color = TextSec, fontSize = 13.sp)
                         }
                         Spacer(Modifier.weight(1f))
+                        if (routines.size > 1) {
+                            TextButton(onClick = { sortMode = !sortMode }) {
+                                Text(if (sortMode) "Fertig" else "Sortieren", color = Violet, fontSize = 13.sp)
+                            }
+                        }
                         IconButton(onClick = { showHistory.value = true }) {
                             Icon(Icons.Outlined.History, "Verlauf", tint = TextSec)
                         }
                     }
                     if (routines.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
-                        Text("Tippen = ausführen · Halten = an/aus · ✎ = bearbeiten",
-                            color = TextSec, fontSize = 11.sp)
+                        Text(
+                            if (sortMode) "Halte ☰ und ziehe an die neue Position."
+                            else "Tippen = ausführen · Halten = an/aus (grau = aus) · ✎ = bearbeiten",
+                            color = TextSec, fontSize = 11.sp
+                        )
                     }
                     Spacer(Modifier.height(6.dp))
                 }
@@ -88,16 +107,59 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                     }
                 }
             }
-            items(routines, key = { it.id }) { r ->
-                RoutineTile(
-                    r = r,
-                    onRun = { RoutineEngine.runAsync(ctx, r) },
-                    onEdit = { onEdit(r.id) },
-                    onToggle = {
-                        Store.setEnabled(r.id, !r.enabled)
-                        TriggerService.sync(ctx)
+            if (sortMode) {
+                itemsIndexed(routines, key = { _, r -> r.id }) { i, r ->
+                    val dragged = i == dragIndex
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .zIndex(if (dragged) 1f else 0f)
+                            .graphicsLayer { translationY = if (dragged) dragOffset else 0f }
+                            .clip(MaterialTheme.shapes.small)
+                            .background(if (dragged) Surface2 else Surface1)
+                            .padding(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Menu, "Verschieben",
+                            tint = if (dragged) Violet else TextSec,
+                            modifier = Modifier.pointerInput(r.id, routines.size) {
+                                detectDragGestures(
+                                    onDragStart = { dragIndex = i; dragOffset = 0f },
+                                    onDrag = { change, amount -> change.consume(); dragOffset += amount.y },
+                                    onDragEnd = {
+                                        val target = (i + (dragOffset / rowStepPx).roundToInt())
+                                            .coerceIn(0, routines.lastIndex)
+                                        if (target != i) Store.moveRoutine(i, target)
+                                        dragIndex = -1; dragOffset = 0f
+                                    },
+                                    onDragCancel = { dragIndex = -1; dragOffset = 0f }
+                                )
+                            }
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(routineIcon(r), fontSize = 20.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            r.name, color = TextPrim, fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
                     }
-                )
+                }
+            } else {
+                items(routines, key = { it.id }) { r ->
+                    RoutineTile(
+                        r = r,
+                        onRun = { RoutineEngine.runAsync(ctx, r) },
+                        onEdit = { onEdit(r.id) },
+                        onToggle = {
+                            Store.setEnabled(r.id, !r.enabled)
+                            TriggerService.sync(ctx)
+                        }
+                    )
+                }
             }
             item(span = { GridItemSpan(1) }) { Spacer(Modifier.height(88.dp)) }
         }
@@ -239,7 +301,7 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
             contentAlignment = Alignment.Center
         ) {
             Text(
-                triggerEmoji(r.triggers.firstOrNull()?.type), fontSize = 28.sp,
+                routineIcon(r), fontSize = 28.sp,
                 modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }
             )
         }
@@ -260,6 +322,15 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (!r.enabled) {
+            Text(
+                "AUS", color = TextSec, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(Surface2)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
             )
         }
         Text(

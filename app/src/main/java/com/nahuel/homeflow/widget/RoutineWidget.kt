@@ -11,6 +11,8 @@ import android.widget.RemoteViews
 import com.nahuel.homeflow.R
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.engine.RoutineEngine
+import com.nahuel.homeflow.ui.routineIcon
+import android.util.TypedValue
 
 /**
  * Resizable multi-button widget. Holds up to 8 automations (ordered); shows as many
@@ -32,6 +34,14 @@ class RoutineWidget : AppWidgetProvider() {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString("routines_$widgetId", routineIds.joinToString(",")).apply()
         }
+
+        fun saveIconMode(ctx: Context, widgetId: Int, icons: Boolean) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean("icons_$widgetId", icons).apply()
+        }
+
+        fun iconModeFor(ctx: Context, widgetId: Int): Boolean =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("icons_$widgetId", false)
 
         fun routinesFor(ctx: Context, widgetId: Int): List<String> =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -62,8 +72,11 @@ class RoutineWidget : AppWidgetProvider() {
             // Fill / hide the 8 cells.
             CELL_IDS.forEachIndexed { i, cellId ->
                 if (i < count && i < ids.size) {
-                    val name = Store.routine(ids[i])?.name ?: "?"
-                    views.setTextViewText(cellId, name)
+                    val r = Store.routine(ids[i])
+                    val iconMode = iconModeFor(ctx, widgetId)
+                    val label = if (iconMode && r != null) routineIcon(r) else (r?.name ?: "?")
+                    views.setTextViewText(cellId, label)
+                    views.setTextViewTextSize(cellId, TypedValue.COMPLEX_UNIT_SP, if (iconMode) 24f else 13f)
                     views.setViewVisibility(cellId, View.VISIBLE)
                     val intent = Intent(ctx, RoutineWidget::class.java).apply {
                         action = ACTION_RUN
@@ -112,7 +125,7 @@ class RoutineWidget : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        appWidgetIds.forEach { prefs.remove("routines_$it") }
+        appWidgetIds.forEach { prefs.remove("routines_$it"); prefs.remove("icons_$it") }
         prefs.apply()
     }
 }

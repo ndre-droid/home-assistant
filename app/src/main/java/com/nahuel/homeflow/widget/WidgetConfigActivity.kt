@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +39,7 @@ class WidgetConfigActivity : ComponentActivity() {
             HomeFlowTheme {
                 val routines by Store.routines.collectAsState()
                 var selected by remember { mutableStateOf(listOf<String>()) }
+                var iconMode by remember { mutableStateOf(false) }
 
                 Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
                     Text("Automationen wählen (max. 8)",
@@ -69,9 +72,21 @@ class WidgetConfigActivity : ComponentActivity() {
                     }
 
                     Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Icons statt Namen", color = TextPrim, fontWeight = FontWeight.SemiBold)
+                            Text("Buttons zeigen das Automations-Icon", color = TextSec, fontSize = 12.sp)
+                        }
+                        Switch(
+                            checked = iconMode, onCheckedChange = { iconMode = it },
+                            colors = SwitchDefaults.colors(checkedTrackColor = Violet)
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
                     Button(
                         onClick = {
                             RoutineWidget.saveMapping(this@WidgetConfigActivity, widgetId, selected)
+                            RoutineWidget.saveIconMode(this@WidgetConfigActivity, widgetId, iconMode)
                             RoutineWidget.update(
                                 this@WidgetConfigActivity,
                                 AppWidgetManager.getInstance(this@WidgetConfigActivity), widgetId
