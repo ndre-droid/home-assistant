@@ -96,6 +96,40 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
             }
         }
 
+        if (existing == null) {
+            GradientCard {
+                SectionTitle("Mit Worten beschreiben  ·  offline")
+                var nlText by remember { mutableStateOf("") }
+                var nlError by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = nlText, onValueChange = { nlText = it },
+                    placeholder = { Text("z. B. Wenn das Badlicht angeht: Licht grün und Vogelsounds auf Bad, nur wenn nichts läuft") },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2
+                )
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = {
+                        nlError = ""
+                        com.nahuel.homeflow.engine.NlParser.parse(nlText, Store.config.value, hueLights)
+                            .onSuccess { parsed ->
+                                if (name.isBlank()) name = parsed.name
+                                triggers = parsed.triggers
+                                branches = parsed.variants
+                            }
+                            .onFailure { nlError = it.message ?: "Nicht verstanden" }
+                    },
+                    enabled = nlText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Violet)
+                ) { Text("Erstellen") }
+                if (nlError.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(nlError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(2.dp))
+                HintText("Versteht Deutsch & Englisch, läuft komplett auf dem Gerät. Ergebnis unten prüfen & anpassen.")
+            }
+        }
+
         GradientCard {
             SectionTitle("Name & Icon")
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -570,6 +604,7 @@ fun describeAction(a: Action, lights: List<HueLight>): String {
                 "play" -> "Play"; "pause" -> "Pause"; "stop" -> "Stopp"
                 "volume" -> "Lautstärke ${a.params["volume"]} %"
                 "play_uri" -> "Wiedergabe starten" + (a.params["volume"]?.let { " ($it %)" } ?: "")
+                "spotify" -> "Spotify: ${a.params["query"]?.take(24) ?: ""}"
                 "mute" -> "Stumm " + (if (a.params["on"] == "false") "aus" else "ein")
                 "night_mode" -> "Night-Mode " + (if (a.params["on"] == "false") "aus" else "ein")
                 "dialog_level" -> "Sprachverbesserung " + (if (a.params["on"] == "false") "aus" else "ein")
@@ -616,7 +651,7 @@ private fun ActionDialog(
     var brightness by remember { mutableStateOf(initial?.params?.get("brightness") ?: "") }
     var excluded by remember { mutableStateOf(initial?.params?.get("exclude")?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()) }
     var volume by remember { mutableStateOf(initial?.params?.get("volume") ?: "") }
-    var uri by remember { mutableStateOf(initial?.params?.get("uri") ?: "") }
+    var uri by remember { mutableStateOf(initial?.params?.get("uri") ?: initial?.params?.get("query") ?: "") }
     var appId by remember { mutableStateOf(initial?.params?.get("appId") ?: "netflix") }
     var contentId by remember { mutableStateOf(initial?.params?.get("contentId") ?: "") }
     var onlyIfIdle by remember { mutableStateOf(initial?.params?.get("onlyIfIdle") == "true") }
@@ -720,7 +755,7 @@ private fun ActionDialog(
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("mute" to "Stumm", "night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
+                            listOf("spotify" to "Spotify", "mute" to "Stumm", "night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
                                 FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
                             }
                         }
@@ -740,6 +775,11 @@ private fun ActionDialog(
                         if (command == "volume" || command == "play_uri") {
                             OutlinedTextField(value = volume, onValueChange = { volume = it },
                                 label = { Text("Lautstärke 0-100") }, singleLine = true)
+                        }
+                        if (command == "spotify") {
+                            OutlinedTextField(value = uri, onValueChange = { uri = it },
+                                label = { Text("Song/Playlist-Suche oder Spotify-Link") }, singleLine = true)
+                            HintText("Braucht Spotify-Verbindung (Einstellungen). Spielt auf dem gewählten Sonos.")
                         }
                         if (command == "play_uri") {
                             OutlinedTextField(value = uri, onValueChange = { uri = it },
@@ -800,6 +840,7 @@ private fun ActionDialog(
                     TargetType.SONOS -> {
                         volume.toIntOrNull()?.let { params["volume"] = it.coerceIn(0, 100).toString() }
                         if (command == "play_uri") params["uri"] = uri.trim()
+                        if (command == "spotify") params["query"] = uri.trim()
                         if (command == "mute" || command == "night_mode" || command == "dialog_level")
                             params["on"] = if (onState == "false") "false" else "true"
                         if ((command == "play" || command == "play_uri") && onlyIfIdle) params["onlyIfIdle"] = "true"

@@ -325,6 +325,38 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
 
         GradientCard {
+            SectionTitle("Spotify")
+            OutlinedTextField(
+                value = config.spotifyClientId,
+                onValueChange = { v -> Store.updateConfig { it.copy(spotifyClientId = v.trim()) } },
+                label = { Text("Client-ID (developer.spotify.com)") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+            Spacer(Modifier.height(6.dp))
+            if (config.spotifyRefresh.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Verbunden ✓", color = Green, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { Store.updateConfig { it.copy(spotifyRefresh = "") } }) {
+                        Text("Trennen", color = Pink)
+                    }
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val verifier = com.nahuel.homeflow.devices.SpotifyClient.newVerifier()
+                        Store.updateConfig { it.copy(spotifyVerifier = verifier) }
+                        val url = com.nahuel.homeflow.devices.SpotifyClient.authUrl(config.spotifyClientId, verifier)
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                    },
+                    enabled = config.spotifyClientId.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Violet)
+                ) { Text("Mit Spotify verbinden") }
+            }
+            Spacer(Modifier.height(4.dp))
+            HintText("Einmalig: developer.spotify.com → Create App → Redirect-URI exakt „homeflow://spotify\" eintragen → Client-ID hier einfügen → verbinden. Braucht Spotify Premium. Danach gibt es die Sonos-Aktion „Spotify\" mit Song-/Playlist-Suche.")
+        }
+
+        GradientCard {
             SectionTitle("Anleitung")
             Button(
                 onClick = { ctx.startActivity(Intent(ctx, ManualActivity::class.java)) },

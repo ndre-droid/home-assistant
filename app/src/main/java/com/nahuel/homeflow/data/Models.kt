@@ -185,7 +185,10 @@ data class Config(
     val shakeRoutineId: String = "",             // routine fired on hard phone shake ("" = off)
     val homeLat: Double = 0.0,                   // geofence home center (0 = not set)
     val homeLon: Double = 0.0,
-    val geofenceRadius: Int = 150                // meters
+    val geofenceRadius: Int = 150,               // meters
+    val spotifyClientId: String = "",            // user's own Spotify dev app
+    val spotifyRefresh: String = "",             // OAuth refresh token ("" = not connected)
+    val spotifyVerifier: String = ""             // transient PKCE verifier during login
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -209,6 +212,7 @@ data class Config(
         })
         put("latitude", latitude); put("longitude", longitude); put("webServerEnabled", webServerEnabled); put("shakeRoutineId", shakeRoutineId)
         put("homeLat", homeLat); put("homeLon", homeLon); put("geofenceRadius", geofenceRadius)
+        put("spotifyClientId", spotifyClientId); put("spotifyRefresh", spotifyRefresh); put("spotifyVerifier", spotifyVerifier)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
     }
 
@@ -262,7 +266,10 @@ data class Config(
                 shakeRoutineId = o.optString("shakeRoutineId", ""),
                 homeLat = o.optDouble("homeLat", 0.0),
                 homeLon = o.optDouble("homeLon", 0.0),
-                geofenceRadius = o.optInt("geofenceRadius", 150)
+                geofenceRadius = o.optInt("geofenceRadius", 150),
+                spotifyClientId = o.optString("spotifyClientId", ""),
+                spotifyRefresh = o.optString("spotifyRefresh", ""),
+                spotifyVerifier = o.optString("spotifyVerifier", "")
             )
         }
     }

@@ -8,6 +8,7 @@ import com.nahuel.homeflow.data.*
 import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.LgTvClient
 import com.nahuel.homeflow.devices.SonosClient
+import com.nahuel.homeflow.devices.SpotifyClient
 import com.nahuel.homeflow.devices.GenericClient
 import kotlinx.coroutines.*
 
@@ -180,6 +181,10 @@ object RoutineEngine {
                 else if (a.params["onlyIfIdle"] == "true" && SonosClient.isPlaying(a.deviceId)) Result.success(Unit)
                 else SonosClient.playUri(a.deviceId, uri, a.params["volume"]?.toIntOrNull(), a.params["meta"].orEmpty())
             }
+            "spotify" -> SpotifyClient.play(
+                a.params["query"].orEmpty(),
+                Store.config.value.sonos.firstOrNull { it.ip == a.deviceId }?.name ?: ""
+            )
             "mute" -> SonosClient.setMute(a.deviceId, a.params["on"] != "false")
             "night_mode" -> SonosClient.setNightMode(a.deviceId, a.params["on"] != "false")
             "dialog_level" -> SonosClient.setDialogLevel(a.deviceId, a.params["on"] != "false")

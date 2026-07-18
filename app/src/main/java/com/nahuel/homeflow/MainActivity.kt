@@ -24,6 +24,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.nahuel.homeflow.engine.RoutineEngine
+import com.nahuel.homeflow.devices.SpotifyClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.nahuel.homeflow.engine.TriggerService
 import com.nahuel.homeflow.ui.*
 
@@ -65,6 +69,25 @@ class MainActivity : ComponentActivity() {
             return
         }
         val data = intent?.data ?: return
+        if (data.scheme == "homeflow" && data.host == "spotify") {
+            val code = data.getQueryParameter("code")
+            if (code != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val ok = SpotifyClient.exchangeCode(code)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        Toast.makeText(
+                            this@MainActivity,
+                            if (ok.isSuccess) "Spotify verbunden ✓"
+                            else "Spotify: ${ok.exceptionOrNull()?.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Spotify-Login abgebrochen", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         if (data.scheme == "homeflow" && data.host == "run") {
             data.lastPathSegment?.let { id ->
                 RoutineEngine.runAsync(this, id)
