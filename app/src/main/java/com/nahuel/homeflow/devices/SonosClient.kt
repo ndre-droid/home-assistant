@@ -48,7 +48,7 @@ object SonosClient {
                 val body = resp.body?.string() ?: ""
                 check(resp.isSuccessful) {
                     when (Regex("<errorCode>(\\d+)</errorCode>").find(body)?.groupValues?.get(1)) {
-                        "714" -> "Sonos kann diese URL nicht abspielen (keine direkte Audio-Datei/Stream). Nutze die 🔍-Suche oder eine MP3-/Radio-URL."
+                        "714" -> "Diese URL hat Sonos abgelehnt. Wähle einen Treffer aus der 🔍-Suche (die liefern jetzt Sonos-taugliche Streams) oder eine direkte MP3-/AAC-URL."
                         "701" -> "Keine Wiedergabequelle. Erst in der Sonos-App etwas abspielen (dann klappt Play/Pause) oder in der Automation \"Sound-URL\" verwenden."
                         "402" -> "Ungültige Parameter (UPnP 402)"
                         null -> "Sonos HTTP ${resp.code}"
@@ -92,6 +92,7 @@ object SonosClient {
     }
 
     /** .m3u/.pls playlists point AT the stream - fetch and use the first real URL inside. */
+    /** .m3u/.pls playlists point AT the stream - fetch and use the first real URL inside. */
     private suspend fun resolvePlaylist(uri: String): String = withContext(Dispatchers.IO) {
         val plain = uri.substringBefore('?').lowercase()
         if (!plain.endsWith(".m3u") && !plain.endsWith(".pls")) return@withContext uri
@@ -105,16 +106,56 @@ object SonosClient {
         }.getOrDefault(uri)
     }
 
-    /** Sets a stream/file URI and starts playback. meta = plain DIDL-Lite XML (optional, from capture). */
+    private val AUDIO_FILE_EXT = listOf(".mp3", ".aac", ".m4a", ".wav", ".flac", ".ogg", ".opus", ".wma")
+
+    /** DIDL-Lite metadata Sonos needs to accept a URI. Radio = audioBroadcast, file = musicTrack. */
+    private fun didl(title: String, isRadio: Boolean): String {
+        val cls = if (isRadio) "object.item.audioItem.audioBroadcast" else "object.item.audioItem.musicTrack"
+        return "<DIDL-Lite xmlns:dc=\"http://purl.org/dc/elements/1.1/\" " +
+            "xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" " +
+            "xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\">" +
+            "<item id=\"R:0/0/0\" parentID=\"R:0/0\" restricted=\"true\">" +
+            "<dc:title>" + esc(title) + "</dc:title>" +
+            "<upnp:class>" + cls + "</upnp:class>" +
+            "<desc id=\"cdudn\" nameSpace=\"urn:schemas-rinconnetworks-com:metadata-1-0/\">" +
+            "SA_RINCON65031_</desc></item></DIDL-Lite>"
+    }
+
+    /**
+     * Plays a stream or file on Sonos. The critical part: continuous internet radio must use
+     * Sonos' own x-rincon-mp3radio:// scheme with audioBroadcast metadata - plain http:// gives
+     * error 714. Real audio FILES (.mp3, .aac, ...) play over http with musicTrack metadata.
+     * meta (from scene capture) overrides everything when provided.
+     */
     suspend fun playUri(ip: String, uri: String, volume: Int?, meta: String = ""): Result<Unit> = runCatching {
-        val real = resolvePlaylist(uri)
+        var real = resolvePlaylist(uri.trim())
+        require(real.startsWith("http", ignoreCase = true)) { "Ungültige URL (muss mit http beginnen)" }
         require(!real.substringBefore('?').lowercase().endsWith(".m3u8")) {
-            "HLS-Stream (.m3u8) - kann Sonos nicht direkt abspielen. Nimm einen MP3/AAC-Stream (🔍-Suche)."
+            "HLS-Stream (.m3u8) kann Sonos nicht abspielen. Nimm einen MP3/AAC-Stream aus der 🔍-Suche."
         }
+
+        val plainPath = real.substringBefore('?').lowercase()
+        val isFile = AUDIO_FILE_EXT.any { plainPath.endsWith(it) }
+        val title = real.substringAfterLast('/').substringBefore('?').ifBlank { "HomeFlow" }
+
+        val playUriStr: String
+        val metaXml: String
+        when {
+            meta.isNotBlank() -> { playUriStr = real; metaXml = meta }         // captured scene
+            isFile -> { playUriStr = real; metaXml = didl(title, isRadio = false) }
+            else -> {
+                // Continuous radio: strip the scheme, Sonos connects over http via its own scheme.
+                val hostPath = real.substringAfter("://")
+                playUriStr = "x-rincon-mp3radio://$hostPath"
+                metaXml = didl(title, isRadio = true)
+            }
+        }
+
         volume?.let { setVolume(ip, it).getOrThrow() }
         soap(
             ip, "AVTransport", "SetAVTransportURI",
-            "<InstanceID>0</InstanceID><CurrentURI>${esc(real)}</CurrentURI><CurrentURIMetaData>${esc(meta)}</CurrentURIMetaData>"
+            "<InstanceID>0</InstanceID><CurrentURI>${esc(playUriStr)}</CurrentURI>" +
+                "<CurrentURIMetaData>${esc(metaXml)}</CurrentURIMetaData>"
         )
         soap(ip, "AVTransport", "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>"); Unit
     }

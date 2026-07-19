@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 fun RadioSearchDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<RadioBrowser.Station>>(emptyList()) }
+    var results by remember { mutableStateOf(RadioBrowser.CURATED) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
 
@@ -49,6 +49,21 @@ fun RadioSearchDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                         Text(if (busy) "…" else "Suchen", color = Violet)
                     }
                 }
+                Spacer(Modifier.height(6.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val quick = listOf("Natur", "Regen", "Meer", "Wald", "Jazz", "Lofi", "Klassik", "Chill", "News")
+                    items(quick.size) { qi ->
+                        AssistChip(
+                            onClick = { query = quick[qi]; runSearch() },
+                            label = { Text(quick[qi], fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                if (results === RadioBrowser.CURATED)
+                    Text("Sofort spielbar (getestet für Sonos):", color = TextSec, fontSize = 11.sp)
                 if (error.isNotEmpty()) Text(error, color = Pink, fontSize = 13.sp)
                 LazyColumn(Modifier.height(300.dp)) {
                     items(results, key = { it.url }) { st ->
