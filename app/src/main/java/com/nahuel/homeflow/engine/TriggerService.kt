@@ -47,6 +47,7 @@ class TriggerService : Service() {
     private var sensorManager: SensorManager? = null
     private var shakeListener: SensorEventListener? = null
     private var lastShake = 0L
+    private val shakePeaks = ArrayDeque<Long>()
     private var geoWatcher: Job? = null
     @Volatile private var wasHome: Boolean? = null
 
@@ -287,12 +288,20 @@ class TriggerService : Service() {
         sensorManager = sm
         val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
         shakeListener = object : SensorEventListener {
+            // A real shake = several HARD jerks in quick succession. Merely holding or
+            // walking with the phone peaks around 1.1-1.6g and never sustains, so it is
+            // ignored. We require 4 peaks above 3.3g within 1.2s, each ~150ms apart.
+            private var lastPeak = 0L
             override fun onSensorChanged(e: SensorEvent) {
                 val g = sqrt(e.values[0]*e.values[0] + e.values[1]*e.values[1] + e.values[2]*e.values[2]) / 9.81f
-                if (g > 2.7f) {   // hard shake threshold
-                    val now = System.currentTimeMillis()
-                    if (now - lastShake > 2000) {   // debounce
+                val now = System.currentTimeMillis()
+                if (g > 3.3f && now - lastPeak > 120) {   // one jerk (debounced so one motion = one peak)
+                    lastPeak = now
+                    shakePeaks.addLast(now)
+                    while (shakePeaks.isNotEmpty() && now - shakePeaks.first() > 1200) shakePeaks.removeFirst()
+                    if (shakePeaks.size >= 4 && now - lastShake > 3000) {  // enough jerks + cooldown
                         lastShake = now
+                        shakePeaks.clear()
                         val id = Store.config.value.shakeRoutineId
                         if (id.isNotBlank()) RoutineEngine.runAsync(applicationContext, id)
                     }

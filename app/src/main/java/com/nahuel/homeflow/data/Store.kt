@@ -75,6 +75,15 @@ object Store {
         persistRoutines()
     }
 
+@Synchronized
+    fun setRoutineOrder(orderedIds: List<String>) {
+        val byId = _routines.value.associateBy { it.id }
+        val reordered = orderedIds.mapNotNull { byId[it] } +
+            _routines.value.filter { it.id !in orderedIds }
+        _routines.value = reordered
+        persistRoutines()
+    }
+
     fun routine(id: String): Routine? = _routines.value.firstOrNull { it.id == id }
 
     @Synchronized

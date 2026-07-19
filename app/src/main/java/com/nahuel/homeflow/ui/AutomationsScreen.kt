@@ -51,6 +51,7 @@ import com.nahuel.homeflow.data.TriggerType
 import com.nahuel.homeflow.engine.RoutineEngine
 import com.nahuel.homeflow.engine.TriggerService
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, onCaptureScene: () -> Unit) {
     val showAddChooser = remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -59,9 +60,13 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
     val routines by Store.routines.collectAsState()
     val ctx = LocalContext.current
     var sortMode by remember { mutableStateOf(false) }
-    var dragIndex by remember { mutableStateOf(-1) }
+    // Live reorder: work on a local copy that visibly reshuffles while dragging.
+    var order by remember { mutableStateOf(routines) }
+    var dragId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(0f) }
-    val rowStepPx = with(LocalDensity.current) { 70.dp.toPx() }
+    val rowStepPx = with(LocalDensity.current) { 66.dp.toPx() }
+    // keep local order in sync whenever the store changes and we're not mid-drag
+    LaunchedEffect(routines, sortMode) { if (dragId == null) order = routines }
 
     Box(modifier.fillMaxSize().statusBarsPadding()) {
         LazyVerticalGrid(
@@ -108,33 +113,53 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 }
             }
             if (sortMode) {
-                itemsIndexed(routines, key = { _, r -> r.id }) { i, r ->
-                    val dragged = i == dragIndex
+                itemsIndexed(order, key = { _, r -> r.id }) { i, r ->
+                    val dragged = r.id == dragId
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(60.dp)
+                            .height(58.dp)
                             .zIndex(if (dragged) 1f else 0f)
-                            .graphicsLayer { translationY = if (dragged) dragOffset else 0f }
+                            .graphicsLayer {
+                                translationY = if (dragged) dragOffset else 0f
+                                scaleX = if (dragged) 1.03f else 1f
+                                scaleY = if (dragged) 1.03f else 1f
+                                shadowElevation = if (dragged) 16f else 0f
+                                alpha = if (dragged) 0.97f else 1f
+                            }
                             .clip(MaterialTheme.shapes.small)
                             .background(if (dragged) Surface2 else Surface1)
                             .padding(horizontal = 12.dp)
+                            .animateItem()
                     ) {
                         Icon(
                             Icons.Filled.Menu, "Verschieben",
                             tint = if (dragged) Violet else TextSec,
-                            modifier = Modifier.pointerInput(r.id, routines.size) {
+                            modifier = Modifier.pointerInput(r.id) {
                                 detectDragGestures(
-                                    onDragStart = { dragIndex = i; dragOffset = 0f },
-                                    onDrag = { change, amount -> change.consume(); dragOffset += amount.y },
-                                    onDragEnd = {
-                                        val target = (i + (dragOffset / rowStepPx).roundToInt())
-                                            .coerceIn(0, routines.lastIndex)
-                                        if (target != i) Store.moveRoutine(i, target)
-                                        dragIndex = -1; dragOffset = 0f
+                                    onDragStart = { dragId = r.id; dragOffset = 0f },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                        // Live swap: once dragged past half a row, reorder the list now.
+                                        val cur = order.indexOfFirst { it.id == dragId }
+                                        if (cur < 0) return@detectDragGestures
+                                        if (dragOffset > rowStepPx / 2 && cur < order.lastIndex) {
+                                            order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
+                                            dragOffset -= rowStepPx
+                                        } else if (dragOffset < -rowStepPx / 2 && cur > 0) {
+                                            order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
+                                            dragOffset += rowStepPx
+                                        }
                                     },
-                                    onDragCancel = { dragIndex = -1; dragOffset = 0f }
+                                    onDragEnd = {
+                                        Store.setRoutineOrder(order.map { it.id })
+                                        dragId = null; dragOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        order = routines; dragId = null; dragOffset = 0f
+                                    }
                                 )
                             }
                         )
