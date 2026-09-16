@@ -305,9 +305,9 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .height(84.dp)
             .graphicsLayer { alpha = if (r.enabled) 1f else 0.45f }
-            .clip(MaterialTheme.shapes.small)
+            .clip(MaterialTheme.shapes.medium)
             .background(tileBg)
             .pressScale(interaction)
             .combinedClickable(
@@ -319,27 +319,36 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
                     onToggle()
                 }
             )
+            .padding(10.dp)
     ) {
-        // leading block, Spotify album-art slot
+        // large rounded album-art thumbnail (Sonos aesthetic)
         Box(
-            Modifier.size(72.dp).background(Surface2),
+            Modifier
+                .size(64.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(Surface2, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                routineIcon(r), fontSize = 28.sp,
+                routineIcon(r), fontSize = 30.sp,
                 modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }
             )
         }
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
             Text(
                 r.name,
                 color = TextPrim,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.2).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 if (runFlash) "▶ Gestartet …"
                 else r.triggers.joinToString(" · ") { triggerLabel(it.type) },

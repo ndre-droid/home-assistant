@@ -113,9 +113,9 @@ fun HomeFlowTheme(
     MaterialTheme(
         colorScheme = scheme,
         shapes = Shapes(
-            small = RoundedCornerShape(8.dp),
-            medium = RoundedCornerShape(12.dp),
-            large = RoundedCornerShape(16.dp)
+            small = RoundedCornerShape(14.dp),
+            medium = RoundedCornerShape(18.dp),
+            large = RoundedCornerShape(24.dp)
         ),
         content = content
     )

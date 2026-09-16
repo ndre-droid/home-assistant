@@ -90,9 +90,9 @@ fun ScreenTitle(text: String) {
     Text(
         text,
         color = TextPrim,
-        fontSize = 28.sp,
+        fontSize = 30.sp,
         fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.5).sp
+        letterSpacing = (-0.7).sp
     )
 }
 
@@ -112,7 +112,7 @@ fun GradientCard(modifier: Modifier = Modifier, content: @Composable ColumnScope
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surface)
             .animateContentSize(tween(200))
-            .padding(16.dp),
+            .padding(horizontal = 18.dp, vertical = 18.dp),
         content = content
     )
 }
@@ -123,10 +123,10 @@ fun SectionTitle(text: String) {
     Text(
         text,
         color = TextPrim,
-        fontSize = 16.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = (-0.2).sp,
-        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+        fontSize = 18.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.3).sp,
+        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
     )
 }
 
