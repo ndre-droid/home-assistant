@@ -16,20 +16,23 @@ object RadioBrowser {
 
     /** Curated, known plain-MP3 streams that work on Sonos out of the box (no search needed). */
     val CURATED: List<Station> = listOf(
-        Station("🐦 Vogelgezwitscher (Natur)", "http://prem2.di.fm/nature", "nature birds"),
-        Station("🌧️ Regen & Gewitter", "https://streams.calmradio.com/api/39/128/stream", "rain thunder"),
-        Station("🌊 Meeresrauschen", "https://streams.calmradio.com/api/103/128/stream", "ocean waves"),
-        Station("🌲 Wald-Ambience", "https://streams.calmradio.com/api/230/128/stream", "forest nature"),
-        Station("🧘 Ruhe / Meditation", "https://streams.calmradio.com/api/204/128/stream", "meditation calm"),
-        Station("🎹 SomaFM: Groove Salad (Chill)", "http://ice1.somafm.com/groovesalad-128-mp3", "chill downtempo"),
-        Station("🚀 SomaFM: Drone Zone (Ambient)", "http://ice1.somafm.com/dronezone-128-mp3", "ambient space"),
-        Station("🌌 SomaFM: Deep Space One", "http://ice1.somafm.com/deepspaceone-128-mp3", "ambient space"),
-        Station("💧 SomaFM: Fluid (Chill-Hop)", "http://ice1.somafm.com/fluid-128-mp3", "chillhop"),
-        Station("☕ SomaFM: Coffeehouse", "http://ice1.somafm.com/coffeehouse-128-mp3", "acoustic folk"),
-        Station("🎷 SomaFM: Sonic Universe (Jazz)", "http://ice1.somafm.com/sonicuniverse-128-mp3", "jazz"),
-        Station("📻 SomaFM: Lush (Vocal)", "http://ice1.somafm.com/lush-128-mp3", "vocal chill"),
-        Station("🎉 SomaFM: Beat Blender (House)", "http://ice1.somafm.com/beatblender-128-mp3", "house electronic"),
-        Station("🔥 SomaFM: Indie Pop Rocks", "http://ice1.somafm.com/indiepop-128-mp3", "indie pop")
+        // SomaFM - all streams are free & open, no login (reliable on Sonos)
+        Station("🎹 Groove Salad (Chill/Ambient)", "http://ice1.somafm.com/groovesalad-128-mp3", "chill ambient"),
+        Station("🚀 Drone Zone (Space/Ambient)", "http://ice1.somafm.com/dronezone-128-mp3", "ambient space"),
+        Station("🌌 Deep Space One (Ambient)", "http://ice1.somafm.com/deepspaceone-128-mp3", "ambient space"),
+        Station("💧 Fluid (Chillhop)", "http://ice1.somafm.com/fluid-128-mp3", "chillhop"),
+        Station("☕ Coffeehouse (Acoustic)", "http://ice1.somafm.com/coffeehouse-128-mp3", "acoustic folk"),
+        Station("🎷 Sonic Universe (Jazz)", "http://ice1.somafm.com/sonicuniverse-128-mp3", "jazz"),
+        Station("📻 Lush (Vocal Chill)", "http://ice1.somafm.com/lush-128-mp3", "vocal chill"),
+        Station("🎉 Beat Blender (Deep House)", "http://ice1.somafm.com/beatblender-128-mp3", "house"),
+        Station("🔥 Indie Pop Rocks", "http://ice1.somafm.com/indiepop-128-mp3", "indie pop"),
+        Station("🌃 Secret Agent (Downtempo)", "http://ice1.somafm.com/secretagent-128-mp3", "downtempo lounge"),
+        Station("🎄 Christmas Lounge", "http://ice1.somafm.com/christmas-128-mp3", "christmas"),
+        Station("🧘 Dubstep Beyond", "http://ice1.somafm.com/dubstep-128-mp3", "dubstep"),
+        // Public radio (open Icecast)
+        Station("🎼 Radio Paradise (Main Mix)", "http://stream.radioparadise.com/mp3-128", "eclectic rock"),
+        Station("🎵 Radio Paradise (Mellow)", "http://stream.radioparadise.com/mellow-128", "mellow"),
+        Station("🎸 Radio Paradise (Rock)", "http://stream.radioparadise.com/rock-128", "rock")
     )
 
     suspend fun search(query: String): Result<List<Station>> = withContext(Dispatchers.IO) {

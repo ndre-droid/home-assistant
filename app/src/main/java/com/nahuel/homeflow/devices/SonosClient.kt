@@ -138,15 +138,21 @@ object SonosClient {
         val isFile = AUDIO_FILE_EXT.any { plainPath.endsWith(it) }
         val title = real.substringAfterLast('/').substringBefore('?').ifBlank { "HomeFlow" }
 
+        val isHttps = real.startsWith("https://", ignoreCase = true)
         val playUriStr: String
         val metaXml: String
         when {
             meta.isNotBlank() -> { playUriStr = real; metaXml = meta }         // captured scene
             isFile -> { playUriStr = real; metaXml = didl(title, isRadio = false) }
+            isHttps -> {
+                // Modern Sonos (Beam/Era) stream https radio directly - do NOT rewrite the scheme
+                // (x-rincon-mp3radio is http-only and would break https-only stations).
+                playUriStr = real
+                metaXml = didl(title, isRadio = true)
+            }
             else -> {
-                // Continuous radio: strip the scheme, Sonos connects over http via its own scheme.
-                val hostPath = real.substringAfter("://")
-                playUriStr = "x-rincon-mp3radio://$hostPath"
+                // Plain http continuous radio: Sonos' own scheme is the most reliable path.
+                playUriStr = "x-rincon-mp3radio://" + real.substringAfter("://")
                 metaXml = didl(title, isRadio = true)
             }
         }

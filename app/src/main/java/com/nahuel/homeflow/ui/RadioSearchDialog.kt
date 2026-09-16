@@ -63,7 +63,7 @@ fun RadioSearchDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                 }
                 Spacer(Modifier.height(4.dp))
                 if (results === RadioBrowser.CURATED)
-                    Text("Sofort spielbar (getestet für Sonos):", color = TextSec, fontSize = 11.sp)
+                    Text("Freie Sender – direkt spielbar auf Sonos:", color = TextSec, fontSize = 11.sp)
                 if (error.isNotEmpty()) Text(error, color = Pink, fontSize = 13.sp)
                 LazyColumn(Modifier.height(300.dp)) {
                     items(results, key = { it.url }) { st ->
