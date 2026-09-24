@@ -1,6 +1,13 @@
 <resources>
-    <color name="ic_bg">#0F0F0F</color>
-    <color name="accent">#1ED760</color>
-    <color name="widget_bg">#1B1B1B</color>
-    <color name="widget_text">#F2F3F7</color>
+    <!-- Modernist: ground #f3f2f2, ink #201e1d, one accent #ec3013. -->
+    <color name="accent">#EC3013</color>
+
+    <!-- Launcher icon background. Deliberately ink, not ground: a near-white
+         adaptive icon disappears on light launcher wallpapers. -->
+    <color name="ic_bg">#201E1D</color>
+
+    <!-- Window and widget surfaces follow the light/dark scheme (see values-night). -->
+    <color name="window_bg">#F3F2F2</color>
+    <color name="widget_bg">#F3F2F2</color>
+    <color name="widget_text">#201E1D</color>
 </resources>

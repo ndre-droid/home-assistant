@@ -1,35 +1,25 @@
 package com.nahuel.homeflow.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,19 +28,25 @@ import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.engine.RoutineEngine
 import com.nahuel.homeflow.engine.TriggerService
+import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * Routine builder, Modernist layout: a top bar carrying the routine icon, name
+ * and the Run button, then stacked sections. Each branch is a bordered block
+ * with a filled header bar over numbered action rows.
+ */
 @Composable
 fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite: (String) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val existing = remember(routineId) { routineId?.takeIf { it.isNotEmpty() }?.let { Store.routine(it) } }
 
-    var draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
+    val draftId by remember { mutableStateOf(existing?.id ?: UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var icon by remember { mutableStateOf(existing?.icon ?: "") }
     var showIconPicker by remember { mutableStateOf(false) }
-    var enabled by remember { mutableStateOf(existing?.enabled ?: true) }
+    val enabled by remember { mutableStateOf(existing?.enabled ?: true) }
     var triggers by remember { mutableStateOf(existing?.triggers ?: listOf(Trigger())) }
     var branches by remember { mutableStateOf(existing?.variants ?: listOf(Variant())) }
 
@@ -72,43 +68,47 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
         return r
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Bg)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowBack, "Zurück", tint = TextPrim) }
-            Text(
-                if (existing == null) "Neue Automation" else "Bearbeiten",
-                color = TextPrim, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
-                letterSpacing = (-0.3).sp,
-                modifier = Modifier.weight(1f)
-            )
-            if (existing != null) {
-                IconButton(onClick = { Store.deleteRoutine(draftId); TriggerService.sync(ctx); onClose() }) {
-                    Icon(Icons.Filled.Delete, "Löschen", tint = MaterialTheme.colorScheme.error)
+    Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding()) {
+
+        // ---- Top bar: back, icon, title, Run ----
+        Column(Modifier.fillMaxWidth().background(Bg)) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconBoxButton(30.dp, "Zurück", onClick = onClose) {
+                    Text("←", color = Ink, fontSize = 14.sp)
                 }
+                Spacer(Modifier.width(12.dp))
+                IconBox(36.dp, Modifier.clickable { showIconPicker = true }) {
+                    Text(icon.ifEmpty { suggestIcon(name) ?: "▶️" }, fontSize = 18.sp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    name.ifBlank { if (existing == null) "Neue Automation" else "Bearbeiten" },
+                    color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2).sp, maxLines = 1, modifier = Modifier.weight(1f)
+                )
+                PrimaryButton("Testen") { RoutineEngine.runAsync(ctx, save()) }
             }
+            Rule()
         }
 
-        if (existing == null) {
-            GradientCard {
-                SectionTitle("Mit Worten beschreiben  ·  offline")
-                var nlText by remember { mutableStateOf("") }
-                var nlError by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = nlText, onValueChange = { nlText = it },
-                    placeholder = { Text("z. B. Wenn das Badlicht angeht: Licht grün und Vogelsounds auf Bad, nur wenn nichts läuft") },
-                    modifier = Modifier.fillMaxWidth(), minLines = 2
-                )
-                Spacer(Modifier.height(6.dp))
-                Button(
-                    onClick = {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+
+            if (existing == null) {
+                Section("Mit Worten beschreiben  ·  offline") {
+                    var nlText by remember { mutableStateOf("") }
+                    var nlError by remember { mutableStateOf("") }
+                    FlatField(
+                        label = "Beschreibung",
+                        value = nlText,
+                        placeholder = "z. B. Wenn das Badlicht angeht: Licht grün und Vogelsounds auf Bad",
+                        singleLine = false,
+                        minLines = 2
+                    ) { nlText = it }
+                    Spacer(Modifier.height(10.dp))
+                    PrimaryButton("Erstellen", enabled = nlText.isNotBlank()) {
                         nlError = ""
                         com.nahuel.homeflow.engine.NlParser.parse(nlText, Store.config.value, hueLights)
                             .onSuccess { parsed ->
@@ -117,62 +117,44 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                                 branches = parsed.variants
                             }
                             .onFailure { nlError = it.message ?: "Nicht verstanden" }
-                    },
-                    enabled = nlText.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Violet)
-                ) { Text("Erstellen") }
-                if (nlError.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(nlError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                    }
+                    if (nlError.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(nlError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    HintText("Versteht Deutsch & Englisch, läuft komplett auf dem Gerät. Ergebnis unten prüfen & anpassen.")
                 }
-                Spacer(Modifier.height(2.dp))
-                HintText("Versteht Deutsch & Englisch, läuft komplett auf dem Gerät. Ergebnis unten prüfen & anpassen.")
             }
-        }
 
-        GradientCard {
-            SectionTitle("Name & Icon")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(Surface2)
-                        .bouncyClick { showIconPicker = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(icon.ifEmpty { suggestIcon(name) ?: "▶️" }, fontSize = 22.sp)
-                }
-                Spacer(Modifier.width(10.dp))
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    placeholder = { Text("z. B. Badlicht-Sound") },
-                    modifier = Modifier.weight(1f), singleLine = true
-                )
+            // ---- Name & Icon ----
+            Section("Name & Icon") {
+                FlatField("Name", name, placeholder = "z. B. Badlicht-Sound") { name = it }
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton("Icon ändern") { showIconPicker = true }
             }
-            TextButton(onClick = { showIconPicker = true }, contentPadding = PaddingValues(0.dp)) {
-                Text("Icon ändern", color = Blue, fontSize = 13.sp)
-            }
-        }
 
-        GradientCard {
-            SectionTitle("Auslöser  ·  einer davon genügt")
-            triggers.forEachIndexed { ti, trg ->
-                if (ti > 0) Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Auslöser ${ti + 1}", color = TextSec, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    if (triggers.size > 1) IconButton(
-                        onClick = { triggers = triggers.filterIndexed { k, _ -> k != ti } },
-                        modifier = Modifier.size(28.dp)
-                    ) { Icon(Icons.Filled.Delete, "Auslöser entfernen", tint = TextSec) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TriggerType.entries.forEach { t ->
-                        FilterChip(
-                            selected = trg.type == t,
-                            onClick = { triggers = triggers.mapIndexed { k, x -> if (k == ti) x.copy(type = t) else x } },
-                            label = {
-                                Text(when (t) {
+            // ---- Trigger ----
+            Section("Auslöser  ·  einer davon genügt") {
+                triggers.forEachIndexed { ti, trg ->
+                    if (ti > 0) {
+                        Spacer(Modifier.height(12.dp))
+                        Rule()
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("Auslöser ${ti + 1}", Modifier.weight(1f))
+                        if (triggers.size > 1) {
+                            IconBoxButton(22.dp, "Auslöser entfernen", onClick = {
+                                triggers = triggers.filterIndexed { k, _ -> k != ti }
+                            }) { Text("−", color = Ink, fontSize = 11.sp) }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    ChipFlow {
+                        TriggerType.entries.forEach { t ->
+                            ChoiceChip(
+                                label = when (t) {
                                     TriggerType.MANUAL -> "Button"
                                     TriggerType.NFC -> "NFC"
                                     TriggerType.DEVICE_STATE -> "Hue-Licht"
@@ -181,243 +163,219 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
                                     TriggerType.SUN -> "Sonne"
                                     TriggerType.ARRIVE_HOME -> "Ankunft"
                                     TriggerType.LEAVE_HOME -> "Weggehen"
-                                })
-                            }
-                        )
-                    }
-                }
-                fun upd(block: (Trigger) -> Trigger) {
-                    triggers = triggers.mapIndexed { k, x -> if (k == ti) block(x) else x }
-                }
-                when (trg.type) {
-                    TriggerType.DEVICE_STATE -> {
-                        Spacer(Modifier.height(8.dp))
-                        LightPicker(hueLights, trg.hueLightId) { picked -> upd { it.copy(hueLightId = picked) } }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = trg.toState, onClick = { upd { it.copy(toState = true) } },
-                                label = { Text("wird eingeschaltet") })
-                            FilterChip(selected = !trg.toState, onClick = { upd { it.copy(toState = false) } },
-                                label = { Text("wird ausgeschaltet") })
+                                },
+                                selected = trg.type == t
+                            ) { triggers = triggers.mapIndexed { k, x -> if (k == ti) x.copy(type = t) else x } }
                         }
                     }
-                    TriggerType.NFC -> {
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { save(); onRequestNfcWrite(draftId) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Surface2)
-                        ) { Text("NFC-Tag beschreiben", color = TextPrim) }
-                    }
-                    TriggerType.LEAVE_WIFI -> {
-                        Spacer(Modifier.height(8.dp))
-                        FilterChip(
-                            selected = trg.partnerAware,
-                            onClick = { upd { it.copy(partnerAware = !it.partnerAware) } },
-                            label = { Text("Nur wenn Partnerin nicht zuhause") }
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
-                    }
-                    TriggerType.TIME -> {
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = trg.time, onValueChange = { v -> upd { it.copy(time = v) } },
-                            label = { Text("Uhrzeit (HH:MM)") }, singleLine = true
-                        )
-                        HintText("Läuft täglich zu dieser Uhrzeit. (Hintergrund-Planung folgt; Auslöser wird gespeichert.)")
-                    }
-                    TriggerType.SUN -> {
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = trg.sunEvent == "SUNRISE",
-                                onClick = { upd { it.copy(sunEvent = "SUNRISE") } }, label = { Text("Sonnenaufgang") })
-                            FilterChip(selected = trg.sunEvent == "SUNSET",
-                                onClick = { upd { it.copy(sunEvent = "SUNSET") } }, label = { Text("Sonnenuntergang") })
-                        }
-                        OutlinedTextField(
-                            value = trg.sunOffsetMin.toString(),
-                            onValueChange = { v -> upd { it.copy(sunOffsetMin = v.toIntOrNull() ?: 0) } },
-                            label = { Text("Minuten davor (-) / danach (+)") }, singleLine = true
-                        )
-                    }
-                    else -> {}
-                }
-                if (ti < triggers.lastIndex) HorizontalDivider(color = Hairline, modifier = Modifier.padding(top = 10.dp))
-            }
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = { triggers = triggers + Trigger() }, contentPadding = PaddingValues(0.dp)) {
-                Text("+ Auslöser hinzufügen", color = Blue, fontSize = 13.sp)
-            }
-        }
 
-        // ================= Flowchart / Entscheidungsbaum =================
-        SectionTitle("Flowchart  ·  Auslöser fließt von oben nach unten, erster passender Zweig gewinnt")
-        // Start node: the triggers feed into the branch flow below.
-        Row(Modifier.height(IntrinsicSize.Min)) {
-            Column(Modifier.width(20.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.padding(top = 16.dp).size(10.dp).clip(CircleShape).background(Violet))
-                Box(Modifier.padding(top = 4.dp).width(2.dp).weight(1f).background(Violet.copy(alpha = 0.5f)))
-            }
-            Spacer(Modifier.width(6.dp))
-            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                Text("START", color = Violet, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.2.sp)
-                Text(
-                    triggers.joinToString("  oder  ") { t ->
-                        when (t.type) {
-                            TriggerType.MANUAL -> "Button/Widget"
-                            TriggerType.NFC -> "NFC-Tag"
-                            TriggerType.DEVICE_STATE -> "Hue-Licht"
-                            TriggerType.LEAVE_WIFI -> "WLAN verlassen"
-                            TriggerType.TIME -> "Uhrzeit ${t.time}"
-                            TriggerType.SUN -> if (t.sunEvent == "SUNRISE") "Sonnenaufgang" else "Sonnenuntergang"
-                            TriggerType.ARRIVE_HOME -> "Ankunft zuhause"
-                            TriggerType.LEAVE_HOME -> "Verlassen (GPS)"
+                    fun upd(block: (Trigger) -> Trigger) {
+                        triggers = triggers.mapIndexed { k, x -> if (k == ti) block(x) else x }
+                    }
+                    when (trg.type) {
+                        TriggerType.DEVICE_STATE -> {
+                            Spacer(Modifier.height(10.dp))
+                            LightPicker(hueLights, trg.hueLightId) { picked -> upd { it.copy(hueLightId = picked) } }
+                            Spacer(Modifier.height(8.dp))
+                            ChipFlow {
+                                ChoiceChip("wird eingeschaltet", trg.toState) { upd { it.copy(toState = true) } }
+                                ChoiceChip("wird ausgeschaltet", !trg.toState) { upd { it.copy(toState = false) } }
+                            }
                         }
-                    },
-                    color = TextPrim, fontSize = 13.sp
-                )
-            }
-        }
-        branches.forEachIndexed { bi, br ->
-            Row(Modifier.height(IntrinsicSize.Min)) {
-                // Baum-Schiene: Knoten + Linie
-                Column(
-                    Modifier.width(20.dp).fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        Modifier.padding(top = 18.dp).size(8.dp).clip(CircleShape)
-                            .background(if (br.conditions.isEmpty()) TextSec else Violet)
-                    )
-                    if (bi < branches.lastIndex) {
-                        Box(
-                            Modifier.padding(top = 4.dp).width(1.dp).weight(1f)
-                                .background(Hairline)
-                        )
+                        TriggerType.NFC -> {
+                            Spacer(Modifier.height(10.dp))
+                            SecondaryButton("NFC-Tag beschreiben") { save(); onRequestNfcWrite(draftId) }
+                        }
+                        TriggerType.LEAVE_WIFI -> {
+                            Spacer(Modifier.height(10.dp))
+                            ChoiceChip("Nur wenn Partnerin nicht zuhause", trg.partnerAware) {
+                                upd { it.copy(partnerAware = !it.partnerAware) }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            HintText("Löst aus, wenn dein Handy das Heim-WLAN verliert. Für die Ausführung danach muss Tailscale aktiv sein.")
+                        }
+                        TriggerType.TIME -> {
+                            Spacer(Modifier.height(10.dp))
+                            FlatField("Uhrzeit (HH:MM)", trg.time) { v -> upd { it.copy(time = v) } }
+                            Spacer(Modifier.height(8.dp))
+                            HintText("Läuft täglich zu dieser Uhrzeit.")
+                        }
+                        TriggerType.SUN -> {
+                            Spacer(Modifier.height(10.dp))
+                            ChipFlow {
+                                ChoiceChip("Sonnenaufgang", trg.sunEvent == "SUNRISE") { upd { it.copy(sunEvent = "SUNRISE") } }
+                                ChoiceChip("Sonnenuntergang", trg.sunEvent == "SUNSET") { upd { it.copy(sunEvent = "SUNSET") } }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            FlatField("Minuten davor (-) / danach (+)", trg.sunOffsetMin.toString()) { v ->
+                                upd { it.copy(sunOffsetMin = v.toIntOrNull() ?: 0) }
+                            }
+                        }
+                        else -> {}
                     }
                 }
-                Spacer(Modifier.width(6.dp))
-                GradientCard(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(12.dp))
+                GhostButton("+ Auslöser hinzufügen") { triggers = triggers + Trigger() }
+            }
+
+            // ---- Flow: start node + branches ----
+            Section("Dann  ·  erster passender Zweig gewinnt") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(Accent))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        SectionLabel("Start")
+                        Spacer(Modifier.height(2.dp))
                         Text(
-                            branchTitle(bi, br, branches.size),
-                            color = if (br.conditions.isEmpty()) TextSec else Violet,
-                            fontSize = 14.sp, fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (bi > 0) IconButton(onClick = { branches = branches.swap(bi, bi - 1) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.KeyboardArrowUp, "Hoch", tint = TextSec)
-                        }
-                        if (bi < branches.lastIndex) IconButton(onClick = { branches = branches.swap(bi, bi + 1) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.KeyboardArrowDown, "Runter", tint = TextSec)
-                        }
-                        if (branches.size > 1) IconButton(onClick = {
-                            branches = branches.filterIndexed { i, _ -> i != bi }
-                        }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.Delete, "Zweig löschen", tint = TextSec)
-                        }
-                    }
-
-                    // Bedingungen
-                    if (br.conditions.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            br.conditions.forEachIndexed { ci, c ->
-                                InputChip(
-                                    selected = true,
-                                    onClick = {
-                                        branches = branches.mapIndexed { i, v ->
-                                            if (i == bi) v.copy(conditions = v.conditions.filterIndexed { j, _ -> j != ci }) else v
-                                        }
-                                    },
-                                    label = { Text(condLabel(c), fontSize = 12.sp) },
-                                    trailingIcon = { Text("×", color = TextSec) }
-                                )
-                            }
-                        }
-                    }
-                    TextButton(onClick = { condDialogFor = bi }, contentPadding = PaddingValues(0.dp)) {
-                        Text("+ Bedingung", color = Blue, fontSize = 13.sp)
-                    }
-
-                    HorizontalDivider(color = Hairline)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("dann:", color = TextSec, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        if (br.actions.isNotEmpty()) TextButton(
-                            onClick = { actionClipboard = br.actions },
-                            contentPadding = PaddingValues(horizontal = 6.dp)
-                        ) { Text("Kopieren", color = TextSec, fontSize = 12.sp) }
-                        if (actionClipboard.isNotEmpty()) TextButton(
-                            onClick = {
-                                branches = branches.mapIndexed { i, v ->
-                                    if (i == bi) v.copy(actions = v.actions + actionClipboard) else v
+                            triggers.joinToString("  oder  ") { t ->
+                                when (t.type) {
+                                    TriggerType.MANUAL -> "Button/Widget"
+                                    TriggerType.NFC -> "NFC-Tag"
+                                    TriggerType.DEVICE_STATE -> "Hue-Licht"
+                                    TriggerType.LEAVE_WIFI -> "WLAN verlassen"
+                                    TriggerType.TIME -> "Uhrzeit ${t.time}"
+                                    TriggerType.SUN -> if (t.sunEvent == "SUNRISE") "Sonnenaufgang" else "Sonnenuntergang"
+                                    TriggerType.ARRIVE_HOME -> "Ankunft zuhause"
+                                    TriggerType.LEAVE_HOME -> "Verlassen (GPS)"
                                 }
                             },
-                            contentPadding = PaddingValues(horizontal = 6.dp)
-                        ) { Text("Einfügen (${actionClipboard.size})", color = Blue, fontSize = 12.sp) }
+                            color = Ink, fontSize = 13.sp
+                        )
                     }
+                }
+                Spacer(Modifier.height(14.dp))
 
-                    br.actions.forEachIndexed { ai, action ->
+                branches.forEachIndexed { bi, br ->
+                    Column(Modifier.fillMaxWidth().border(RuleWidth, Divider)) {
+                        // Branch header bar
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                            Modifier.fillMaxWidth().background(Fill).padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Drag handle: drag up/down to reorder actions within the branch.
-                            ActionDragHandle(ai, br.actions.size) { from, to ->
-                                branches = branches.mapIndexed { i, v ->
-                                    if (i == bi) v.copy(actions = v.actions.moveAt(from, to)) else v
+                            Text(
+                                branchTitle(bi, br, branches.size),
+                                color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (bi > 0) IconBoxButton(20.dp, "Hoch", onClick = { branches = branches.swap(bi, bi - 1) }) {
+                                Text("↑", color = Ink, fontSize = 10.sp)
+                            }
+                            if (bi < branches.lastIndex) {
+                                Spacer(Modifier.width(4.dp))
+                                IconBoxButton(20.dp, "Runter", onClick = { branches = branches.swap(bi, bi + 1) }) {
+                                    Text("↓", color = Ink, fontSize = 10.sp)
                                 }
                             }
-                            Column(
-                                Modifier.weight(1f).clickable { actionDialog = bi to action }.padding(vertical = 4.dp)
-                            ) {
-                                Text(describeAction(action, hueLights), color = TextPrim, fontSize = 14.sp)
-                                if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
-                                    Text("⚠ Sound-URL fehlt, antippen", color = Pink, fontSize = 12.sp)
-                                }
-                            }
-                            IconButton(onClick = {
-                                branches = branches.mapIndexed { i, v ->
-                                    if (i == bi) v.copy(actions = v.actions.filterIndexed { j, _ -> j != ai }) else v
-                                }
-                            }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Filled.Delete, "Aktion löschen", tint = TextSec)
+                            if (branches.size > 1) {
+                                Spacer(Modifier.width(4.dp))
+                                IconBoxButton(20.dp, "Zweig löschen", onClick = {
+                                    branches = branches.filterIndexed { i, _ -> i != bi }
+                                }) { Text("−", color = Ink, fontSize = 11.sp) }
                             }
                         }
-                    }
-                    TextButton(onClick = { actionDialog = bi to null }, contentPadding = PaddingValues(0.dp)) {
-                        Text("+ Aktion", color = Violet, fontSize = 13.sp)
-                    }
-                }
-            }
-        }
-        TextButton(onClick = { branches = branches + Variant() }) {
-            Text("+ Zweig hinzufügen (Sonst wenn … / Sonst)", color = Blue)
-        }
+                        Rule()
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    save()
-                    justSaved = true
-                    scope.launch { kotlinx.coroutines.delay(650); onClose() }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (justSaved) Green else Violet
-                ),
-                modifier = Modifier.weight(1f)
-            ) {
-                AnimatedContent(targetState = justSaved, label = "saveLabel") { saved ->
-                    if (saved) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Check, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Gespeichert")
-                    } else Text("Speichern")
+                        // Conditions
+                        Column(Modifier.padding(10.dp)) {
+                            if (br.conditions.isNotEmpty()) {
+                                ChipFlow {
+                                    br.conditions.forEachIndexed { ci, c ->
+                                        ChoiceChip(condLabel(c), selected = true, trailing = "×") {
+                                            branches = branches.mapIndexed { i, v ->
+                                                if (i == bi) v.copy(conditions = v.conditions.filterIndexed { j, _ -> j != ci }) else v
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            GhostButton("+ Bedingung") { condDialogFor = bi }
+                        }
+                        Rule()
+
+                        // Actions
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SectionLabel("Aktionen", Modifier.weight(1f))
+                            if (br.actions.isNotEmpty()) {
+                                GhostButton("Kopieren", color = Muted) { actionClipboard = br.actions }
+                            }
+                            if (actionClipboard.isNotEmpty()) {
+                                GhostButton("Einfügen (${actionClipboard.size})") {
+                                    branches = branches.mapIndexed { i, v ->
+                                        if (i == bi) v.copy(actions = v.actions + actionClipboard) else v
+                                    }
+                                }
+                            }
+                        }
+
+                        br.actions.forEachIndexed { ai, action ->
+                            Rule()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                IconBox(18.dp) {
+                                    Text("${ai + 1}", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f).clickable { actionDialog = bi to action }) {
+                                    Text(describeAction(action, hueLights), color = Ink, fontSize = 13.sp)
+                                    if (action.command == "play_uri" && action.params["uri"].isNullOrBlank()) {
+                                        Text(
+                                            "⚠ Sound-URL fehlt, antippen",
+                                            color = MaterialTheme.colorScheme.error, fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                                ActionDragHandle(ai, br.actions.size) { from, to ->
+                                    branches = branches.mapIndexed { i, v ->
+                                        if (i == bi) v.copy(actions = v.actions.moveAt(from, to)) else v
+                                    }
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                IconBoxButton(22.dp, "Aktion löschen", onClick = {
+                                    branches = branches.mapIndexed { i, v ->
+                                        if (i == bi) v.copy(actions = v.actions.filterIndexed { j, _ -> j != ai }) else v
+                                    }
+                                }) { Text("−", color = Ink, fontSize = 11.sp) }
+                            }
+                        }
+                        Rule()
+                        Box(Modifier.padding(10.dp)) {
+                            GhostButton("+ Aktion") { actionDialog = bi to null }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                GhostButton("+ Zweig hinzufügen (Sonst wenn … / Sonst)") { branches = branches + Variant() }
+            }
+
+            // ---- Save / delete ----
+            Section {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PrimaryButton(
+                        if (justSaved) "Gespeichert ✓" else "Speichern",
+                        Modifier.weight(1f)
+                    ) {
+                        save()
+                        justSaved = true
+                        scope.launch { kotlinx.coroutines.delay(650); onClose() }
+                    }
+                    SecondaryButton("Abbrechen", onClick = onClose)
+                    if (existing != null) {
+                        GhostButton("Löschen", color = MaterialTheme.colorScheme.error) {
+                            Store.deleteRoutine(draftId); TriggerService.sync(ctx); onClose()
+                        }
+                    }
                 }
             }
-            OutlinedButton(
-                onClick = { RoutineEngine.runAsync(ctx, save()) },
-                modifier = Modifier.weight(1f)
-            ) { Text("Testen ▶", color = TextPrim) }
+
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
     }
 
     if (showIconPicker) {
@@ -455,15 +413,28 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
     }
 }
 
+/** Wrapping row of chips — the builder offers more choices than fit one line. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipFlow(content: @Composable FlowRowScope.() -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        content = content
+    )
+}
+
 @Composable
 private fun ActionDragHandle(index: Int, total: Int, onMove: (from: Int, to: Int) -> Unit) {
-    val stepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.toPx() }
+    val stepPx = with(LocalDensity.current) { 44.dp.toPx() }
     var accum by remember(index) { mutableStateOf(0f) }
     var cur by remember(index) { mutableStateOf(index) }
-    Icon(
-        Icons.Filled.Menu, contentDescription = "Ziehen zum Sortieren", tint = TextSec,
+    Text(
+        "☰",
+        color = Muted,
+        fontSize = 13.sp,
         modifier = Modifier
-            .size(26.dp)
+            .size(22.dp)
             .pointerInput(index, total) {
                 detectDragGestures(
                     onDragStart = { accum = 0f; cur = index },
@@ -482,7 +453,6 @@ private fun <T> List<T>.moveAt(from: Int, to: Int): List<T> {
     if (from == to || from !in indices || to !in indices) return this
     val m = toMutableList(); val item = m.removeAt(from); m.add(to, item); return m
 }
-
 
 private fun List<Variant>.swap(a: Int, b: Int): List<Variant> {
     val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m
@@ -516,10 +486,13 @@ private fun CondDialog(onDismiss: () -> Unit, onConfirm: (Cond) -> Unit) {
     var speakerIp by remember { mutableStateOf(cfg.sonos.firstOrNull()?.ip ?: "") }
     val needsSpeaker = type == CondType.SPEAKER_IDLE || type == CondType.SPEAKER_PLAYING
 
-    AlertDialog(
+    FlatDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        title = { Text("Bedingung hinzufügen", color = TextPrim) },
+        title = "Bedingung hinzufügen",
+        confirmButton = {
+            GhostButton("Hinzufügen") { onConfirm(Cond(type, if (needsSpeaker) speakerIp else "")) }
+        },
+        dismissButton = { GhostButton("Abbrechen", color = Muted, onClick = onDismiss) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
@@ -533,32 +506,32 @@ private fun CondDialog(onDismiss: () -> Unit, onConfirm: (Cond) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().clickable { type = t }
                     ) {
-                        RadioButton(selected = type == t, onClick = { type = t },
-                            colors = RadioButtonDefaults.colors(selectedColor = Violet))
-                        Text(label, color = TextPrim, fontSize = 14.sp)
+                        IconBox(16.dp, fill = if (type == t) Accent else Bg) {}
+                        Spacer(Modifier.width(10.dp))
+                        Text(label, color = Ink, fontSize = 13.sp)
                     }
                 }
                 if (needsSpeaker) {
                     var open by remember { mutableStateOf(false) }
                     val label = cfg.sonos.firstOrNull { it.ip == speakerIp }?.name ?: "Speaker wählen…"
                     Box {
-                        OutlinedButton(onClick = { open = true }) { Text(label, color = TextPrim) }
-                        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        SecondaryButton(label) { open = true }
+                        DropdownMenu(
+                            expanded = open,
+                            onDismissRequest = { open = false },
+                            modifier = Modifier.background(Bg).border(RuleWidth, Divider)
+                        ) {
                             cfg.sonos.forEach { s ->
-                                DropdownMenuItem(text = { Text(s.name) },
-                                    onClick = { speakerIp = s.ip; open = false })
+                                DropdownMenuItem(
+                                    text = { Text(s.name, color = Ink, fontSize = 13.sp) },
+                                    onClick = { speakerIp = s.ip; open = false }
+                                )
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(Cond(type, if (needsSpeaker) speakerIp else ""))
-            }) { Text("Hinzufügen", color = Violet) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
+        }
     )
 }
 
@@ -567,10 +540,17 @@ private fun LightPicker(lights: List<HueLight>, selectedId: String, onSelect: (S
     var open by remember { mutableStateOf(false) }
     val label = lights.firstOrNull { it.id == selectedId }?.name ?: "Lampe wählen…"
     Box {
-        OutlinedButton(onClick = { open = true }) { Text(label, color = TextPrim) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        SecondaryButton(label) { open = true }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier.background(Bg).border(RuleWidth, Divider)
+        ) {
             lights.forEach { l ->
-                DropdownMenuItem(text = { Text(l.name) }, onClick = { onSelect(l.id); open = false })
+                DropdownMenuItem(
+                    text = { Text(l.name, color = Ink, fontSize = 13.sp) },
+                    onClick = { onSelect(l.id); open = false }
+                )
             }
         }
     }
@@ -658,177 +638,11 @@ private fun ActionDialog(
     var showWheel by remember { mutableStateOf(false) }
     var showRadio by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    FlatDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        title = { Text(if (initial == null) "Aktion hinzufügen" else "Aktion bearbeiten", color = TextPrim) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TargetType.entries.forEach { t ->
-                        FilterChip(
-                            selected = target == t,
-                            onClick = {
-                                target = t
-                                deviceId = when (t) {
-                                    TargetType.HUE -> "all"
-                                    TargetType.SONOS -> cfg.sonos.firstOrNull()?.ip ?: ""
-                                    TargetType.LG_TV -> cfg.tvs.firstOrNull()?.ip ?: ""
-                                    TargetType.GENERIC -> cfg.generics.firstOrNull()?.name ?: ""
-                                }
-                                command = when (t) {
-                                    TargetType.HUE -> "set"; TargetType.SONOS -> "play"; TargetType.LG_TV -> "off"; TargetType.GENERIC -> "fire"
-                                }
-                            },
-                            label = { Text(when (t) {
-                                TargetType.HUE -> "Hue"; TargetType.SONOS -> "Sonos"; TargetType.LG_TV -> "TV"; TargetType.GENERIC -> "HTTP"
-                            }) }
-                        )
-                    }
-                }
-                // Device picker: horizontal chip rail (Spotify device-picker feel)
-                val devices: List<Pair<String, String>> = when (target) {
-                    TargetType.HUE -> listOf("all" to "💡 Alle Lampen") + hueLights.map { it.id to "💡 ${it.name}" }
-                    TargetType.SONOS -> listOf("all" to "🔊 Alle Speaker") + cfg.sonos.map { it.ip to "🔊 ${it.name}" }
-                    TargetType.LG_TV -> cfg.tvs.map { it.ip to "📺 ${it.name}" }
-                    TargetType.GENERIC -> cfg.generics.map { it.name to "🔌 ${it.name}" }
-                }
-                androidx.compose.foundation.lazy.LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(devices.size) { di ->
-                        val (id, label) = devices[di]
-                        FilterChip(
-                            selected = deviceId == id,
-                            onClick = { deviceId = id },
-                            label = { Text(label) },
-                            shape = CircleShape
-                        )
-                    }
-                }
-
-                when (target) {
-                    TargetType.HUE -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = onState == "true", onClick = { onState = if (onState == "true") "" else "true" }, label = { Text("An") })
-                            FilterChip(selected = onState == "false", onClick = { onState = if (onState == "false") "" else "false" }, label = { Text("Aus") })
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            presetColors.forEach { hex ->
-                                val c = Color(android.graphics.Color.parseColor(hex))
-                                Box(
-                                    Modifier.size(24.dp).clip(CircleShape).background(c)
-                                        .clickable { color = if (color == hex) "" else hex }
-                                )
-                            }
-                        }
-                        TextButton(onClick = { showWheel = true }, contentPadding = PaddingValues(0.dp)) {
-                            Text("🎨 Farbrad öffnen", color = Violet)
-                        }
-                        if (color.isNotEmpty()) Text("Farbe: $color", color = TextSec, fontSize = 12.sp)
-                        OutlinedTextField(value = brightness, onValueChange = { brightness = it },
-                            label = { Text("Helligkeit 1-100 (leer = unverändert)") }, singleLine = true)
-                        if (deviceId == "all" && hueLights.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text("Ausnehmen (bleiben unverändert):", color = TextSec, fontSize = 12.sp)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                hueLights.forEach { l ->
-                                    FilterChip(
-                                        selected = l.id in excluded,
-                                        onClick = { excluded = if (l.id in excluded) excluded - l.id else excluded + l.id },
-                                        label = { Text(l.name, fontSize = 12.sp) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    TargetType.SONOS -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("play" to "Play", "pause" to "Pause", "stop" to "Stopp")
-                                .forEach { (c, l) ->
-                                    FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                                }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("volume" to "Lautstärke", "play_uri" to "Sound-URL").forEach { (c, l) ->
-                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("spotify" to "Spotify", "mute" to "Stumm", "night_mode" to "Night-Mode", "dialog_level" to "Sprache+").forEach { (c, l) ->
-                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                            }
-                        }
-                        if (command == "mute" || command == "night_mode" || command == "dialog_level") {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(selected = onState != "false", onClick = { onState = "true" }, label = { Text("Ein") })
-                                FilterChip(selected = onState == "false", onClick = { onState = "false" }, label = { Text("Aus") })
-                            }
-                        }
-                        if (command == "play" || command == "play_uri") {
-                            FilterChip(
-                                selected = onlyIfIdle,
-                                onClick = { onlyIfIdle = !onlyIfIdle },
-                                label = { Text("Nur wenn gerade nichts läuft") }
-                            )
-                        }
-                        if (command == "volume" || command == "play_uri") {
-                            OutlinedTextField(value = volume, onValueChange = { volume = it },
-                                label = { Text("Lautstärke 0-100") }, singleLine = true)
-                        }
-                        if (command == "spotify") {
-                            OutlinedTextField(value = uri, onValueChange = { uri = it },
-                                label = { Text("Song/Playlist-Suche oder Spotify-Link") }, singleLine = true)
-                            HintText("Braucht Spotify-Verbindung (Einstellungen). Spielt auf dem gewählten Sonos.")
-                        }
-                        if (command == "play_uri") {
-                            OutlinedTextField(value = uri, onValueChange = { uri = it },
-                                label = { Text("Audio-URL (MP3/Stream, kein YouTube)") }, singleLine = true)
-                            TextButton(onClick = { showRadio = true }, contentPadding = PaddingValues(0.dp)) {
-                                Text("🔍 Sounds & Sender suchen", color = Blue)
-                            }
-                        }
-                    }
-                    TargetType.LG_TV -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("on" to "An", "off" to "Aus", "mute" to "Stumm").forEach { (c, l) ->
-                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("volume" to "Lautstärke", "app" to "App öffnen").forEach { (c, l) ->
-                                FilterChip(selected = command == c, onClick = { command = c }, label = { Text(l) })
-                            }
-                        }
-                        if (command == "volume") {
-                            OutlinedTextField(value = volume, onValueChange = { volume = it },
-                                label = { Text("Lautstärke 0-100") }, singleLine = true)
-                        }
-                        if (command == "app") {
-                            var appOpen by remember { mutableStateOf(false) }
-                            val appLabel = tvApps.firstOrNull { it.first == appId }?.second ?: "App wählen…"
-                            Box {
-                                OutlinedButton(onClick = { appOpen = true }) { Text(appLabel, color = TextPrim) }
-                                DropdownMenu(expanded = appOpen, onDismissRequest = { appOpen = false }) {
-                                    tvApps.forEach { (id, label) ->
-                                        DropdownMenuItem(text = { Text(label) },
-                                            onClick = { appId = id; appOpen = false })
-                                    }
-                                }
-                            }
-                            OutlinedTextField(value = contentId, onValueChange = { contentId = it },
-                                label = { Text("Optional: YouTube-Link/-ID oder Netflix-Titel-ID") }, singleLine = true)
-                            HintText("Leer = App öffnet normal. Mit YouTube-Link startet direkt das Video.")
-                        }
-                    }
-                    TargetType.GENERIC -> {
-                        HintText("Dieses Gerät sendet seine HTTP-Anfrage. Bearbeite URL/Methode im Geräte-Tab.")
-                    }
-                }
-            }
-        },
+        title = if (initial == null) "Aktion hinzufügen" else "Aktion bearbeiten",
         confirmButton = {
-            TextButton(onClick = {
+            GhostButton("OK") {
                 val params = mutableMapOf<String, String>()
                 when (target) {
                     TargetType.HUE -> {
@@ -861,9 +675,147 @@ private fun ActionDialog(
                     else -> command
                 }
                 onConfirm(Action(target, deviceId, cmd, params))
-            }) { Text("OK", color = Violet) }
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
+        dismissButton = { GhostButton("Abbrechen", color = Muted, onClick = onDismiss) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ChipFlow {
+                    TargetType.entries.forEach { t ->
+                        ChoiceChip(
+                            label = when (t) {
+                                TargetType.HUE -> "Hue"; TargetType.SONOS -> "Sonos"
+                                TargetType.LG_TV -> "TV"; TargetType.GENERIC -> "HTTP"
+                            },
+                            selected = target == t
+                        ) {
+                            target = t
+                            deviceId = when (t) {
+                                TargetType.HUE -> "all"
+                                TargetType.SONOS -> cfg.sonos.firstOrNull()?.ip ?: ""
+                                TargetType.LG_TV -> cfg.tvs.firstOrNull()?.ip ?: ""
+                                TargetType.GENERIC -> cfg.generics.firstOrNull()?.name ?: ""
+                            }
+                            command = when (t) {
+                                TargetType.HUE -> "set"; TargetType.SONOS -> "play"
+                                TargetType.LG_TV -> "off"; TargetType.GENERIC -> "fire"
+                            }
+                        }
+                    }
+                }
+
+                val devices: List<Pair<String, String>> = when (target) {
+                    TargetType.HUE -> listOf("all" to "💡 Alle Lampen") + hueLights.map { it.id to "💡 ${it.name}" }
+                    TargetType.SONOS -> listOf("all" to "🔊 Alle Speaker") + cfg.sonos.map { it.ip to "🔊 ${it.name}" }
+                    TargetType.LG_TV -> cfg.tvs.map { it.ip to "📺 ${it.name}" }
+                    TargetType.GENERIC -> cfg.generics.map { it.name to "🔌 ${it.name}" }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(devices) { (id, label) ->
+                        ChoiceChip(label, selected = deviceId == id) { deviceId = id }
+                    }
+                }
+
+                when (target) {
+                    TargetType.HUE -> {
+                        ChipFlow {
+                            ChoiceChip("An", onState == "true") { onState = if (onState == "true") "" else "true" }
+                            ChoiceChip("Aus", onState == "false") { onState = if (onState == "false") "" else "false" }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            presetColors.forEach { hex ->
+                                val c = Color(android.graphics.Color.parseColor(hex))
+                                Box(
+                                    Modifier
+                                        .size(24.dp)
+                                        .background(c)
+                                        .border(if (color == hex) RuleWidth else 1.dp, if (color == hex) Ink else Faint)
+                                        .clickable { color = if (color == hex) "" else hex }
+                                )
+                            }
+                        }
+                        GhostButton("Farbrad öffnen") { showWheel = true }
+                        if (color.isNotEmpty()) Caption("Farbe: $color")
+                        FlatField("Helligkeit 1-100 (leer = unverändert)", brightness) { brightness = it }
+                        if (deviceId == "all" && hueLights.isNotEmpty()) {
+                            SectionLabel("Ausnehmen (bleiben unverändert)")
+                            ChipFlow {
+                                hueLights.forEach { l ->
+                                    ChoiceChip(l.name, l.id in excluded) {
+                                        excluded = if (l.id in excluded) excluded - l.id else excluded + l.id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TargetType.SONOS -> {
+                        ChipFlow {
+                            listOf(
+                                "play" to "Play", "pause" to "Pause", "stop" to "Stopp",
+                                "volume" to "Lautstärke", "play_uri" to "Sound-URL",
+                                "spotify" to "Spotify", "mute" to "Stumm",
+                                "night_mode" to "Night-Mode", "dialog_level" to "Sprache+"
+                            ).forEach { (c, l) ->
+                                ChoiceChip(l, command == c) { command = c }
+                            }
+                        }
+                        if (command == "mute" || command == "night_mode" || command == "dialog_level") {
+                            ChipFlow {
+                                ChoiceChip("Ein", onState != "false") { onState = "true" }
+                                ChoiceChip("Aus", onState == "false") { onState = "false" }
+                            }
+                        }
+                        if (command == "play" || command == "play_uri") {
+                            ChoiceChip("Nur wenn gerade nichts läuft", onlyIfIdle) { onlyIfIdle = !onlyIfIdle }
+                        }
+                        if (command == "volume" || command == "play_uri") {
+                            FlatField("Lautstärke 0-100", volume) { volume = it }
+                        }
+                        if (command == "spotify") {
+                            FlatField("Song/Playlist-Suche oder Spotify-Link", uri) { uri = it }
+                            HintText("Braucht Spotify-Verbindung (Einstellungen). Spielt auf dem gewählten Sonos.")
+                        }
+                        if (command == "play_uri") {
+                            FlatField("Audio-URL (MP3/Stream, kein YouTube)", uri) { uri = it }
+                            GhostButton("Sounds & Sender suchen") { showRadio = true }
+                        }
+                    }
+                    TargetType.LG_TV -> {
+                        ChipFlow {
+                            listOf(
+                                "on" to "An", "off" to "Aus", "mute" to "Stumm",
+                                "volume" to "Lautstärke", "app" to "App öffnen"
+                            ).forEach { (c, l) -> ChoiceChip(l, command == c) { command = c } }
+                        }
+                        if (command == "volume") FlatField("Lautstärke 0-100", volume) { volume = it }
+                        if (command == "app") {
+                            var appOpen by remember { mutableStateOf(false) }
+                            val appLabel = tvApps.firstOrNull { it.first == appId }?.second ?: "App wählen…"
+                            Box {
+                                SecondaryButton(appLabel) { appOpen = true }
+                                DropdownMenu(
+                                    expanded = appOpen,
+                                    onDismissRequest = { appOpen = false },
+                                    modifier = Modifier.background(Bg).border(RuleWidth, Divider)
+                                ) {
+                                    tvApps.forEach { (id, label) ->
+                                        DropdownMenuItem(
+                                            text = { Text(label, color = Ink, fontSize = 13.sp) },
+                                            onClick = { appId = id; appOpen = false }
+                                        )
+                                    }
+                                }
+                            }
+                            FlatField("Optional: YouTube-Link/-ID oder Netflix-Titel-ID", contentId) { contentId = it }
+                            HintText("Leer = App öffnet normal. Mit YouTube-Link startet direkt das Video.")
+                        }
+                    }
+                    TargetType.GENERIC -> {
+                        HintText("Dieses Gerät sendet seine HTTP-Anfrage. Bearbeite URL/Methode im Geräte-Tab.")
+                    }
+                }
+            }
+        }
     )
 
     if (showWheel) {

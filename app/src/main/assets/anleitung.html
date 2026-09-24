@@ -5,29 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HomeFlow – Handbuch</title>
 <style>
+  /* Modernist: flat, red-on-ground, 2px rules, zero radius. */
   :root{
-    --bg:#0F0F0F; --card:#12151C; --card2:#171B24;
-    --blue:#1ED760; --violet:#1ED760; --pink:#EC5F9E; --green:#3DD68C;
-    --text:#F4F6FB; --sec:#98A0B4; --line:#20242F;
+    --bg:#F3F2F2; --card:#F3F2F2; --card2:#EBEAEA;
+    --blue:#AB220D; --violet:#AB220D; --pink:#AB220D; --green:#AB220D;
+    --accent:#EC3013; --text:#201E1D; --sec:#575453; --line:#201E1D;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#201E1D; --card:#201E1D; --card2:#2B2928;
+      --blue:#F4715C; --violet:#F4715C; --pink:#F4715C; --green:#F4715C;
+      --text:#F3F2F2; --sec:#A5A09E; --line:#F3F2F2;
+    }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   body{margin:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,'Segoe UI',Roboto,sans-serif; font-size:16px; line-height:1.55;
     padding:16px 14px 60px}
-  header{padding:26px 6px 16px}
-  h1{margin:0; font-size:28px; font-weight:600; letter-spacing:-.5px; color:var(--text)}
+  header{padding:26px 6px 16px; border-bottom:2px solid var(--line)}
+  h1{margin:0; font-size:28px; font-weight:700; letter-spacing:-.5px; color:var(--text)}
   header p{color:var(--sec); margin:6px 0 0; font-size:14px}
-  section{background:var(--card); border:.5px solid var(--line); border-radius:14px; padding:16px; margin:12px 0}
-  h2{margin:0 0 10px; font-size:18px; font-weight:600; color:var(--blue)}
-  h3{margin:14px 0 4px; font-size:15px; font-weight:600}
+  section{background:var(--card); border:2px solid var(--line); border-radius:0; padding:16px; margin:14px 0}
+  h2{margin:0 0 10px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--sec)}
+  h3{margin:14px 0 4px; font-size:15px; font-weight:700}
   p,li{color:var(--text); font-size:14.5px}
   .sec{color:var(--sec); font-size:13px}
   ol,ul{margin:6px 0; padding-left:20px}
   li{margin:4px 0}
-  code{background:var(--card2); padding:2px 6px; border-radius:6px; font-size:13px; color:var(--green)}
-  .tag{display:inline-block; background:var(--card2); color:var(--blue); font-size:11px;
-    padding:2px 8px; border-radius:8px; margin-right:4px}
-  .warn{border-left:0; background:var(--card2); border-radius:10px; padding:10px 12px; margin:8px 0; font-size:13px; color:var(--sec)}
+  code{background:var(--card2); padding:2px 6px; border-radius:0; font-size:13px; color:var(--text)}
+  .tag{display:inline-block; background:var(--bg); color:var(--text); font-size:11px; font-weight:600;
+    padding:2px 8px; border:2px solid var(--line); border-radius:0; margin-right:4px}
+  .warn{background:var(--card2); border:2px solid var(--line); border-radius:0; padding:10px 12px; margin:8px 0; font-size:13px; color:var(--sec)}
 </style>
 </head>
 <body>

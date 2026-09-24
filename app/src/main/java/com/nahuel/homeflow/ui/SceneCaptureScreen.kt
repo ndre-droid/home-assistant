@@ -4,13 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,99 +39,107 @@ fun SceneCaptureScreen(onClose: () -> Unit) {
             HueClient.lights().onSuccess { lights = orderLights(it, Store.config.value.lightOrder) }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(Bg).verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowBack, "Zurück", tint = TextPrim) }
-            Text("Szene aufnehmen", color = TextPrim, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
+    Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding()) {
+        TopBar(
+            "Szene aufnehmen",
+            leading = {
+                IconBoxButton(30.dp, "Zurück", onClick = onClose) { Text("←", color = Ink, fontSize = 14.sp) }
+            }
+        )
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
 
-        GradientCard {
-            HintText("Stelle Licht und Musik JETZT so ein, wie die Szene sein soll (z. B. für „Movie Night\": Bias-Light dimmen, Beam-Lautstärke setzen). Dann Geräte anhaken und speichern — der aktuelle Zustand wird eingefroren.")
-        }
+            Section {
+                HintText("Stelle Licht und Musik JETZT so ein, wie die Szene sein soll (z. B. für „Movie Night\": Bias-Light dimmen, Beam-Lautstärke setzen). Dann Geräte anhaken und speichern — der aktuelle Zustand wird eingefroren.")
+            }
 
-        GradientCard {
-            SectionTitle("Name")
-            OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                placeholder = { Text("z. B. Movie Night") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
-            )
-        }
+            Section("Name") {
+                FlatField("Name", name, placeholder = "z. B. Movie Night") { name = it }
+            }
 
-        if (lights.isNotEmpty()) {
-            GradientCard {
-                SectionTitle("Hue-Lampen (Zustand wird übernommen)")
-                lights.forEach { l ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
+            if (lights.isNotEmpty()) {
+                Section("Hue-Lampen (Zustand wird übernommen)") {
+                    lights.forEach { l ->
+                        CheckRow(
+                            label = l.name,
+                            meta = if (l.on) "an · ${l.brightness} %" else "aus",
                             checked = l.id in selLights,
-                            onCheckedChange = { c ->
-                                selLights = if (c) selLights + l.id else selLights - l.id
-                            },
-                            colors = CheckboxDefaults.colors(checkedColor = Violet)
-                        )
-                        Text(l.name, color = TextPrim, modifier = Modifier.weight(1f))
-                        Text(
-                            if (l.on) "an · ${l.brightness} %" else "aus",
-                            color = TextSec, fontSize = 12.sp
+                            onToggle = { c -> selLights = if (c) selLights + l.id else selLights - l.id }
                         )
                     }
                 }
             }
-        }
 
-        if (config.sonos.isNotEmpty()) {
-            GradientCard {
-                SectionTitle("Sonos (Lautstärke + laufende Wiedergabe)")
-                config.sonos.forEach { sp ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
+            if (config.sonos.isNotEmpty()) {
+                Section("Sonos (Lautstärke + laufende Wiedergabe)") {
+                    config.sonos.forEach { sp ->
+                        CheckRow(
+                            label = sp.name,
+                            meta = "",
                             checked = sp.ip in selSpeakers,
-                            onCheckedChange = { c ->
+                            onToggle = { c ->
                                 selSpeakers = if (c) selSpeakers + sp.ip else selSpeakers - sp.ip
                                 if (!c) nightMode = nightMode - sp.ip
-                            },
-                            colors = CheckboxDefaults.colors(checkedColor = Blue)
-                        )
-                        Text(sp.name, color = TextPrim, modifier = Modifier.weight(1f))
-                        if (sp.ip in selSpeakers) {
-                            FilterChip(
-                                selected = sp.ip in nightMode,
-                                onClick = {
+                            }
+                        ) {
+                            if (sp.ip in selSpeakers) {
+                                ChoiceChip("Night-Mode", sp.ip in nightMode) {
                                     nightMode = if (sp.ip in nightMode) nightMode - sp.ip else nightMode + sp.ip
-                                },
-                                label = { Text("Night-Mode", fontSize = 12.sp) }
-                            )
+                                }
+                            }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    HintText("Night-Mode + Sprachverbesserung: nur Beam/Arc. Wird beim Abspielen der Szene aktiviert.")
                 }
-                Spacer(Modifier.height(4.dp))
-                HintText("Night-Mode + Sprachverbesserung: nur Beam/Arc. Wird beim Abspielen der Szene aktiviert.")
             }
-        }
 
-        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-
-        Button(
-            onClick = {
-                busy = true; error = ""
-                scope.launch {
-                    SceneCapture.capture(name, selLights, selSpeakers, nightMode)
-                        .onSuccess { Store.saveRoutine(it); onClose() }
-                        .onFailure { error = it.message ?: "Fehler beim Aufnehmen" }
-                    busy = false
+            Section {
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(10.dp))
                 }
-            },
-            enabled = !busy && (selLights.isNotEmpty() || selSpeakers.isNotEmpty()),
-            colors = ButtonDefaults.buttonColors(containerColor = Violet),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-            else Text("Szene speichern")
+                PrimaryButton(
+                    if (busy) "Nimmt auf…" else "Szene speichern",
+                    Modifier.fillMaxWidth(),
+                    enabled = !busy && (selLights.isNotEmpty() || selSpeakers.isNotEmpty())
+                ) {
+                    busy = true; error = ""
+                    scope.launch {
+                        SceneCapture.capture(name, selLights, selSpeakers, nightMode)
+                            .onSuccess { Store.saveRoutine(it); onClose() }
+                            .onFailure { error = it.message ?: "Fehler beim Aufnehmen" }
+                        busy = false
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** Square checkbox row: bordered box, ticked when selected. */
+@Composable
+private fun CheckRow(
+    label: String,
+    meta: String,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+    ) {
+        IconBoxButton(18.dp, onClick = { onToggle(!checked) }) {
+            if (checked) Text("✓", color = Ink, fontSize = 10.sp)
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(label, color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        if (meta.isNotEmpty()) {
+            Caption(meta)
+            Spacer(Modifier.width(8.dp))
+        }
+        trailing()
     }
 }

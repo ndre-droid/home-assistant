@@ -1,9 +1,11 @@
 <resources>
     <style name="Theme.HomeFlow" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/ic_bg</item>
-        <item name="android:statusBarColor">@color/ic_bg</item>
-        <item name="android:navigationBarColor">@color/ic_bg</item>
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:statusBarColor">@color/window_bg</item>
+        <item name="android:navigationBarColor">@color/window_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
+    <!-- Widget button: flat, 2dp ink border, zero radius, flush-centred label. -->
     <style name="WidgetBtn">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>

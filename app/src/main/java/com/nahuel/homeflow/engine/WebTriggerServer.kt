@@ -86,12 +86,15 @@ object WebTriggerServer {
         }
         return """<!doctype html><html><head><meta name=viewport content="width=device-width,initial-scale=1">
 <title>HomeFlow</title><style>
-body{background:#0B0D12;color:#F4F6FB;font-family:-apple-system,system-ui,sans-serif;margin:0;padding:24px}
-h1{font-size:22px;font-weight:600;margin:0 0 20px}
-button{display:block;width:100%;padding:18px;margin:10px 0;font-size:17px;font-weight:600;
-color:#fff;background:#3B6EF5;border:none;border-radius:14px;transition:transform .1s,background .2s}
-button:active{transform:scale(.97)}.done{background:#3DD68C!important}
-</style></head><body><h1>HomeFlow</h1>$buttons
+:root{--bg:#F3F2F2;--ink:#201E1D;--accent:#EC3013}
+@media(prefers-color-scheme:dark){:root{--bg:#201E1D;--ink:#F3F2F2}}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,system-ui,sans-serif;margin:0;padding:24px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:0 0 8px}
+hr{border:0;border-top:2px solid var(--ink);margin:0 0 20px}
+button{display:block;width:100%;padding:18px;margin:0 0 -2px;font-size:16px;font-weight:600;text-align:left;
+color:var(--ink);background:var(--bg);border:2px solid var(--ink);border-radius:0;font-family:inherit}
+.done{background:var(--accent)!important;color:#fff!important}
+</style></head><body><h1>HomeFlow</h1><hr>$buttons
 <script>function flash(b){b.classList.add('done');setTimeout(()=>b.classList.remove('done'),800)}</script>
 </body></html>"""
     }

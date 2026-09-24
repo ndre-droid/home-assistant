@@ -4,32 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,30 +42,35 @@ fun orderLights(lights: List<HueLight>, order: List<String>): List<HueLight> {
     return lights.sortedBy { idx[it.id] ?: Int.MAX_VALUE }
 }
 
-/** Card with a tap-to-collapse header. Expansion survives tab switches. */
+/**
+ * Integration group: uppercase header with its actions, 2dp rule, then the rows.
+ * Tapping the header collapses the group; that state survives tab switches.
+ */
 @Composable
-private fun CollapsibleSection(
+private fun DeviceGroup(
     key: String,
     title: String,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
     var expanded by rememberSaveable(key) { mutableStateOf(false) }
-    GradientCard {
+    Column(Modifier.fillMaxWidth().background(Bg)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(start = 16.dp, end = 10.dp, top = 14.dp, bottom = 10.dp)
         ) {
-            Text(title, color = TextPrim, fontSize = 16.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f).padding(vertical = 6.dp))
+            SectionLabel(title, Modifier.weight(1f))
             if (expanded) actions()
-            Icon(
-                if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Einklappen" else "Ausklappen",
-                tint = TextSec
-            )
+            Text(if (expanded) "−" else "+", color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
-        if (expanded) content()
+        Rule()
+        if (expanded) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { content() }
+            Rule()
+        }
     }
 }
 
@@ -99,35 +92,64 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(config.hueAppKey, config.hueBridgeIp) { refreshLights() }
     LaunchedEffect(config.lightOrder) { lights = orderLights(lights, config.lightOrder) }
 
-    Column(
-        modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier.fillMaxSize().background(Bg).statusBarsPadding()) {
+        TopBar("Geräte") {
+            SecondaryButton("Alles aus") {
+                scope.launch {
+                    HueClient.setLight("all", on = false, brightness = null, colorHex = null)
+                    config.sonos.forEach { s -> scope.launch { SonosClient.pause(s.ip) } }
+                    config.tvs.forEach { t -> scope.launch { LgTvClient.powerOff(t.ip, t.clientKey) } }
+                }
+            }
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            if (status.isNotEmpty()) {
+                Column {
+                    Text(
+                        status,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(AccentTint)
+                            .clickable { status = "" }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                    Rule()
+                }
+            }
+
+            HueSection(config, lights, onStatus = { status = it }, onRefresh = { refreshLights() })
+            SonosSection(config, onStatus = { status = it })
+            TvSection(config, onStatus = { status = it })
+            GenericSection(config, onStatus = { status = it })
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** Device line: square status dot, name, meta caption, trailing controls. */
+@Composable
+private fun DeviceRow(
+    name: String,
+    meta: String,
+    on: Boolean,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: @Composable RowScope.() -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ScreenTitle("Geräte")
-            Spacer(Modifier.weight(1f))
-            Button(
-                onClick = {
-                    scope.launch {
-                        HueClient.setLight("all", on = false, brightness = null, colorHex = null)
-                        config.sonos.forEach { s -> scope.launch { SonosClient.pause(s.ip) } }
-                        config.tvs.forEach { t -> scope.launch { LgTvClient.powerOff(t.ip, t.clientKey) } }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Surface2)
-            ) { Text("Alles aus", color = TextPrim) }
+        if (leading != null) leading() else StatusDot(on)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            if (meta.isNotEmpty()) Caption(meta)
         }
-        if (status.isNotEmpty()) {
-            Text(status, color = MaterialTheme.colorScheme.error, fontSize = 13.sp,
-                modifier = Modifier.clickable { status = "" })
-        }
-
-        HueSection(config, lights, onStatus = { status = it }, onRefresh = { refreshLights() })
-        SonosSection(config, onStatus = { status = it })
-        TvSection(config, onStatus = { status = it })
-
-        GenericSection(config, onStatus = { status = it })
-        Spacer(Modifier.height(24.dp))
+        trailing()
     }
 }
 
@@ -139,39 +161,30 @@ private fun HueSection(config: Config, lights: List<HueLight>, onStatus: (String
     var bridgeIp by remember(config.hueBridgeIp) { mutableStateOf(config.hueBridgeIp) }
     var sortMode by remember { mutableStateOf(false) }
 
-    CollapsibleSection(
+    DeviceGroup(
         key = "hue", title = "Philips Hue",
         actions = {
             if (config.hueAppKey.isNotEmpty()) {
-                TextButton(onClick = { sortMode = !sortMode }) {
-                    Text(if (sortMode) "Fertig" else "Sortieren", color = Violet, fontSize = 13.sp)
-                }
-                IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, "Aktualisieren", tint = TextSec) }
+                GhostButton(if (sortMode) "Fertig" else "Sortieren") { sortMode = !sortMode }
+                GhostButton("Aktualisieren", onClick = onRefresh)
             }
         }
     ) {
         if (config.hueAppKey.isEmpty()) {
-            OutlinedTextField(
-                value = bridgeIp, onValueChange = { bridgeIp = it },
-                label = { Text("Bridge-IP (z. B. 192.168.178.30)") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
-            )
+            FlatField("Bridge-IP", bridgeIp, placeholder = "192.168.178.30") { bridgeIp = it }
             Spacer(Modifier.height(8.dp))
             HintText("IP: Hue-App → Einstellungen → Meine Hue-Systeme. Knopf auf der Bridge drücken, dann Koppeln.")
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    scope.launch {
-                        HueClient.pair(bridgeIp.trim())
-                            .onSuccess { key ->
-                                Store.updateConfig { it.copy(hueBridgeIp = bridgeIp.trim(), hueAppKey = key) }
-                                onStatus("Hue verbunden ✓")
-                            }
-                            .onFailure { onStatus("Hue: ${it.message}") }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Violet)
-            ) { Text("Koppeln") }
+            Spacer(Modifier.height(10.dp))
+            PrimaryButton("Koppeln") {
+                scope.launch {
+                    HueClient.pair(bridgeIp.trim())
+                        .onSuccess { key ->
+                            Store.updateConfig { it.copy(hueBridgeIp = bridgeIp.trim(), hueAppKey = key) }
+                            onStatus("Hue verbunden ✓")
+                        }
+                        .onFailure { onStatus("Hue: ${it.message}") }
+                }
+            }
         } else if (sortMode) {
             SortableLightList(lights)
         } else {
@@ -190,7 +203,7 @@ private fun SortableLightList(lights: List<HueLight>) {
     var dragOffset by remember { mutableStateOf(0f) }
 
     HintText("Halte ☰ gedrückt und ziehe die Lampe an ihre Position.")
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(6.dp))
     Column {
         lights.forEachIndexed { i, light ->
             val dragged = i == dragIndex
@@ -201,14 +214,12 @@ private fun SortableLightList(lights: List<HueLight>) {
                     .height(rowHeight)
                     .zIndex(if (dragged) 1f else 0f)
                     .graphicsLayer { translationY = if (dragged) dragOffset else 0f }
-                    .background(
-                        if (dragged) Surface2 else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .padding(horizontal = 6.dp)
+                    .background(if (dragged) AccentTint else Color.Transparent)
             ) {
-                Icon(
-                    Icons.Filled.Menu, "Verschieben", tint = if (dragged) Violet else TextSec,
+                Text(
+                    "☰",
+                    color = if (dragged) AccentText else Muted,
+                    fontSize = 15.sp,
                     modifier = Modifier.pointerInput(light.id, lights.size) {
                         detectDragGestures(
                             onDragStart = { dragIndex = i; dragOffset = 0f },
@@ -228,8 +239,8 @@ private fun SortableLightList(lights: List<HueLight>) {
                         )
                     }
                 )
-                Spacer(Modifier.width(12.dp))
-                Text(light.name, color = TextPrim)
+                Spacer(Modifier.width(14.dp))
+                Text(light.name, color = Ink, fontSize = 14.sp)
             }
         }
     }
@@ -242,17 +253,16 @@ private fun LightRow(light: HueLight) {
     var brightness by remember(light.id) { mutableStateOf(light.brightness.toFloat()) }
     var showWheel by remember { mutableStateOf(false) }
 
-    Column(Modifier.padding(vertical = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(light.name, color = TextPrim, modifier = Modifier.weight(1f))
-            Switch(
-                checked = on,
-                onCheckedChange = { v ->
-                    on = v
-                    scope.launch { HueClient.setLight(light.id, on = v, brightness = null, colorHex = null) }
-                },
-                colors = SwitchDefaults.colors(checkedTrackColor = Violet, uncheckedTrackColor = Surface2)
-            )
+    Column {
+        DeviceRow(
+            name = light.name,
+            meta = if (on) "An · ${brightness.toInt()} %" else "Aus",
+            on = on
+        ) {
+            FlatToggle(on) { v ->
+                on = v
+                scope.launch { HueClient.setLight(light.id, on = v, brightness = null, colorHex = null) }
+            }
         }
         if (on) {
             Slider(
@@ -263,13 +273,19 @@ private fun LightRow(light: HueLight) {
                     }
                 },
                 valueRange = 1f..100f,
-                colors = SliderDefaults.colors(thumbColor = Violet, activeTrackColor = Violet)
+                colors = SliderDefaults.colors(
+                    thumbColor = Accent,
+                    activeTrackColor = Accent,
+                    inactiveTrackColor = Fill
+                )
             )
             if (light.supportsColor) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     colorPresets.forEach { (hex, c) ->
                         Box(
-                            Modifier.size(26.dp).clip(CircleShape).background(c)
+                            Modifier
+                                .size(24.dp)
+                                .background(c)
                                 .clickable {
                                     scope.launch {
                                         HueClient.setLight(light.id, on = null, brightness = null, colorHex = hex)
@@ -278,11 +294,16 @@ private fun LightRow(light: HueLight) {
                         )
                     }
                     Box(
-                        Modifier.size(26.dp).clip(CircleShape)
-                            .background(Brush.sweepGradient(listOf(
-                                Color.Red, Color.Yellow, Color.Green, Color.Cyan,
-                                Color.Blue, Color.Magenta, Color.Red
-                            )))
+                        Modifier
+                            .size(24.dp)
+                            .background(
+                                Brush.sweepGradient(
+                                    listOf(
+                                        Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                        Color.Blue, Color.Magenta, Color.Red
+                                    )
+                                )
+                            )
                             .clickable { showWheel = true }
                     )
                 }
@@ -297,6 +318,7 @@ private fun LightRow(light: HueLight) {
                 )
             }
         }
+        Rule()
     }
 }
 
@@ -307,10 +329,10 @@ private fun SonosSection(config: Config, onStatus: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var searching by remember { mutableStateOf(false) }
 
-    CollapsibleSection(
+    DeviceGroup(
         key = "sonos", title = "Sonos",
         actions = {
-            TextButton(onClick = {
+            GhostButton(if (searching) "Suche…" else "+ Suchen") {
                 searching = true
                 scope.launch {
                     val found = SonosClient.discover()
@@ -323,7 +345,7 @@ private fun SonosSection(config: Config, onStatus: (String) -> Unit) {
                     }.also { onStatus("Sonos aktualisiert: ${found.joinToString { it.name }}") }
                     searching = false
                 }
-            }) { Text(if (searching) "Suche…" else "Suchen", color = Violet, fontSize = 13.sp) }
+            }
         }
     ) {
         if (config.sonos.isEmpty()) HintText("Tippe auf „Suchen\", um Beam & Era 100 zu finden.")
@@ -336,45 +358,57 @@ private fun SonosRow(sp: SonosSpeaker, index: Int, total: Int, onStatus: (String
     val scope = rememberCoroutineScope()
     var volume by remember(sp.ip) { mutableStateOf(25f) }
 
-    Column(Modifier.padding(vertical = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            DragHandle(index, total) { from, to ->
+    Column {
+        DeviceRow(
+            name = sp.name,
+            meta = sp.ip,
+            on = true,
+            leading = { DragHandle(index, total) { from, to ->
                 Store.updateConfig { it.copy(sonos = it.sonos.moveItem(from, to)) }
-            }
-            Text(sp.name, color = TextPrim, modifier = Modifier.weight(1f))
-            TextButton(onClick = {
+            } }
+        ) {
+            IconBoxButton(26.dp, "Play", onClick = {
+                scope.launch {
+                    SonosClient.setMute(sp.ip, false)
+                    SonosClient.play(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") }
+                }
+            }) { Text("▶", color = Ink, fontSize = 10.sp) }
+            Spacer(Modifier.width(6.dp))
+            IconBoxButton(26.dp, "Pause", onClick = {
+                scope.launch { SonosClient.pause(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") } }
+            }) { Text("⏸", color = Ink, fontSize = 10.sp) }
+            Spacer(Modifier.width(6.dp))
+            IconBoxButton(26.dp, "Stumm", onClick = {
                 scope.launch {
                     SonosClient.setMute(sp.ip, true)
                         .onSuccess { onStatus("${sp.name}: stumm ✓ (Play = wieder laut)") }
                         .onFailure { onStatus("${sp.name}: ${it.message}") }
                 }
-            }) { Text("Stumm", color = Pink, fontSize = 13.sp) }
-            TextButton(onClick = {
+            }) { Text("✕", color = Ink, fontSize = 10.sp) }
+            Spacer(Modifier.width(6.dp))
+            IconBoxButton(26.dp, "Test", onClick = {
                 scope.launch {
                     SonosClient.getVolume(sp.ip)
                         .onSuccess { onStatus("${sp.name}: erreichbar ✓ (Lautstärke $it %)") }
                         .onFailure { onStatus("${sp.name}: ${it.message}") }
                 }
-            }) { Text("Test", color = Green, fontSize = 13.sp) }
-            IconButton(onClick = {
-                scope.launch {
-                    SonosClient.setMute(sp.ip, false)
-                    SonosClient.play(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") }
-                }
-            }) { Icon(Icons.Filled.PlayArrow, "Play", tint = Green) }
-            IconButton(onClick = {
-                scope.launch { SonosClient.pause(sp.ip).onFailure { onStatus("${sp.name}: ${it.message}") } }
-            }) { Icon(Icons.Filled.Clear, "Pause", tint = TextSec) }
-            IconButton(onClick = {
+            }) { Text("?", color = Ink, fontSize = 11.sp) }
+            Spacer(Modifier.width(6.dp))
+            IconBoxButton(26.dp, "Entfernen", onClick = {
                 Store.updateConfig { it.copy(sonos = it.sonos.filterNot { s -> s.ip == sp.ip }) }
-            }) { Icon(Icons.Filled.Delete, "Entfernen", tint = TextSec) }
+            }) { Text("−", color = Ink, fontSize = 12.sp) }
         }
         Slider(
             value = volume, onValueChange = { volume = it },
             onValueChangeFinished = { scope.launch { SonosClient.setVolume(sp.ip, volume.toInt()) } },
             valueRange = 0f..100f,
-            colors = SliderDefaults.colors(thumbColor = Blue, activeTrackColor = Blue)
+            colors = SliderDefaults.colors(
+                thumbColor = Accent,
+                activeTrackColor = Accent,
+                inactiveTrackColor = Fill
+            )
         )
+        Rule()
     }
 }
 
@@ -387,110 +421,96 @@ private fun TvSection(config: Config, onStatus: (String) -> Unit) {
     var ip by remember { mutableStateOf("") }
     var mac by remember { mutableStateOf("") }
 
-    CollapsibleSection(key = "tv", title = "LG TV") {
+    DeviceGroup(key = "tv", title = "LG TV") {
         config.tvs.forEachIndexed { ti, tv ->
             var editing by remember(tv.ip) { mutableStateOf(false) }
             var macEdit by remember(tv.ip) { mutableStateOf(tv.mac) }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
-                DragHandle(ti, config.tvs.size) { from, to ->
+            val paired = tv.clientKey.isNotEmpty() && tv.mac.isNotBlank()
+            DeviceRow(
+                name = tv.name,
+                meta = buildString {
+                    append(if (tv.clientKey.isEmpty()) "Nicht gekoppelt" else "Gekoppelt ✓")
+                    append(if (tv.mac.isBlank()) "  ·  MAC fehlt" else "  ·  MAC ✓")
+                    append("  ·  ${tv.ip}")
+                },
+                on = paired,
+                leading = { DragHandle(ti, config.tvs.size) { from, to ->
                     Store.updateConfig { it.copy(tvs = it.tvs.moveItem(from, to)) }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(tv.name, color = TextPrim)
-                    Text(
-                        buildString {
-                            append(if (tv.clientKey.isEmpty()) "Nicht gekoppelt" else "Gekoppelt ✓")
-                            append(if (tv.mac.isBlank()) "  ·  MAC fehlt" else "  ·  MAC ✓")
-                        },
-                        color = if (tv.clientKey.isEmpty() || tv.mac.isBlank()) MaterialTheme.colorScheme.error else Green,
-                        fontSize = 12.sp
-                    )
-                }
-                TextButton(onClick = {
+                } }
+            ) {
+                GhostButton("An") {
                     scope.launch {
-                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt, unten das Zahnrad antippen und MAC eintragen.")
+                        if (tv.mac.isBlank()) onStatus("TV an: MAC fehlt, Einstellungen antippen und MAC eintragen.")
                         else LgTvClient.powerOn(tv.mac)
                             .onSuccess { onStatus("${tv.name}: Einschalt-Signal gesendet (dauert ein paar Sek.)") }
                             .onFailure { onStatus("TV: ${it.message}") }
                     }
-                }) { Text("An", color = Green) }
-                TextButton(onClick = {
+                }
+                GhostButton("Aus", color = Muted) {
                     scope.launch {
                         LgTvClient.powerOff(tv.ip, tv.clientKey).onFailure {
                             onStatus("TV nicht erreichbar, ist er an? Bei ausgeschaltetem TV geht nur Einschalten.")
                         }
                     }
-                }) { Text("Aus", color = TextSec) }
-                IconButton(onClick = { editing = !editing }) {
-                    Icon(Icons.Filled.Settings, "Bearbeiten", tint = TextSec)
+                }
+                IconBoxButton(26.dp, "Bearbeiten", onClick = { editing = !editing }) {
+                    Text("⚙", color = Ink, fontSize = 11.sp)
                 }
             }
             if (editing) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 22.dp, bottom = 6.dp)) {
-                    OutlinedTextField(
-                        value = macEdit, onValueChange = { macEdit = it },
-                        label = { Text("MAC (für Einschalten)") },
-                        modifier = Modifier.weight(1f), singleLine = true
-                    )
-                    TextButton(onClick = {
-                        Store.updateConfig { cfg ->
-                            cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(mac = macEdit.trim()) else it })
-                        }
-                        editing = false
-                        onStatus("${tv.name}: MAC gespeichert ✓")
-                    }) { Text("Speichern", color = Violet) }
-                }
-                if (tv.clientKey.isEmpty()) {
-                    TextButton(
-                        onClick = {
-                            onStatus("Kopplungs-Anfrage am TV bestätigen…")
-                            scope.launch {
-                                LgTvClient.pair(tv.ip)
-                                    .onSuccess { key ->
-                                        Store.updateConfig { cfg ->
-                                            cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(clientKey = key) else it })
-                                        }
-                                        onStatus("TV gekoppelt ✓")
-                                    }
-                                    .onFailure { onStatus("TV: ${it.message} (TV an? IP korrekt?)") }
+                Column(Modifier.padding(start = 20.dp, bottom = 10.dp)) {
+                    FlatField("MAC (für Einschalten)", macEdit) { macEdit = it }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryButton("Speichern") {
+                            Store.updateConfig { cfg ->
+                                cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(mac = macEdit.trim()) else it })
                             }
-                        },
-                        modifier = Modifier.padding(start = 22.dp)
-                    ) { Text("Koppeln", color = Violet) }
+                            editing = false
+                            onStatus("${tv.name}: MAC gespeichert ✓")
+                        }
+                        if (tv.clientKey.isEmpty()) {
+                            SecondaryButton("Koppeln") {
+                                onStatus("Kopplungs-Anfrage am TV bestätigen…")
+                                scope.launch {
+                                    LgTvClient.pair(tv.ip)
+                                        .onSuccess { key ->
+                                            Store.updateConfig { cfg ->
+                                                cfg.copy(tvs = cfg.tvs.map { if (it.ip == tv.ip) it.copy(clientKey = key) else it })
+                                            }
+                                            onStatus("TV gekoppelt ✓")
+                                        }
+                                        .onFailure { onStatus("TV: ${it.message} (TV an? IP korrekt?)") }
+                                }
+                            }
+                        }
+                        GhostButton("TV entfernen", color = MaterialTheme.colorScheme.error) {
+                            Store.updateConfig { it.copy(tvs = it.tvs.filterNot { t -> t.ip == tv.ip }) }
+                        }
+                    }
                 }
-                TextButton(
-                    onClick = { Store.updateConfig { it.copy(tvs = it.tvs.filterNot { t -> t.ip == tv.ip }) } },
-                    modifier = Modifier.padding(start = 22.dp)
-                ) { Text("TV entfernen", color = Pink) }
             }
+            Rule()
+        }
+        Spacer(Modifier.height(12.dp))
+        FlatField("Name", name) { name = it }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) { FlatField("IP", ip) { ip = it } }
+            Box(Modifier.weight(1f)) { FlatField("MAC", mac) { mac = it } }
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = name, onValueChange = { name = it },
-            label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = ip, onValueChange = { ip = it },
-                label = { Text("IP") }, modifier = Modifier.weight(1f), singleLine = true)
-            OutlinedTextField(value = mac, onValueChange = { mac = it },
-                label = { Text("MAC (für Einschalten)") }, modifier = Modifier.weight(1f), singleLine = true)
-        }
-        Spacer(Modifier.height(6.dp))
         HintText("IP & MAC: TV → Einstellungen → Netzwerk → WLAN → Erweitert. „Einschalten über WLAN\" am TV aktivieren.")
         Spacer(Modifier.height(10.dp))
-        Button(
-            onClick = {
-                if (ip.isNotBlank()) {
-                    Store.updateConfig { it.copy(tvs = it.tvs + LgTv(name.trim(), ip.trim(), "", mac.trim())) }
-                    onStatus("TV \"${name.trim()}\" gespeichert. Jetzt koppeln (Zahnrad).")
-                    ip = ""; mac = ""
-                } else onStatus("Bitte zuerst die IP eingeben.")
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Violet),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("TV speichern", fontWeight = FontWeight.Medium) }
+        PrimaryButton("TV speichern", Modifier.fillMaxWidth()) {
+            if (ip.isNotBlank()) {
+                Store.updateConfig { it.copy(tvs = it.tvs + LgTv(name.trim(), ip.trim(), "", mac.trim())) }
+                onStatus("TV \"${name.trim()}\" gespeichert. Jetzt koppeln (Zahnrad).")
+                ip = ""; mac = ""
+            } else onStatus("Bitte zuerst die IP eingeben.")
+        }
     }
 }
-
 
 /**
  * Small drag handle. Drag it up/down; every ~44dp of travel moves the row one step.
@@ -502,11 +522,12 @@ private fun DragHandle(index: Int, total: Int, onMove: (from: Int, to: Int) -> U
     val stepPx = with(density) { 44.dp.toPx() }
     var accum by remember(index) { mutableStateOf(0f) }
     var curIndex by remember(index) { mutableStateOf(index) }
-    Icon(
-        Icons.Filled.Menu, contentDescription = "Ziehen zum Sortieren", tint = TextSec,
+    Text(
+        "☰",
+        color = Muted,
+        fontSize = 14.sp,
         modifier = Modifier
-            .size(28.dp)
-            .padding(end = 4.dp)
+            .size(24.dp)
             .pointerInput(index, total) {
                 detectDragGestures(
                     onDragStart = { accum = 0f; curIndex = index },
@@ -531,7 +552,6 @@ private fun <T> List<T>.moveItem(from: Int, to: Int): List<T> {
     val m = toMutableList(); val item = m.removeAt(from); m.add(to, item); return m
 }
 
-
 /** User-defined HTTP/webhook devices (Shelly, Tasmota, Home Assistant, IFTTT...). */
 @Composable
 private fun GenericSection(config: Config, onStatus: (String) -> Unit) {
@@ -541,56 +561,48 @@ private fun GenericSection(config: Config, onStatus: (String) -> Unit) {
     var post by remember { mutableStateOf(false) }
     var body by remember { mutableStateOf("") }
 
-    CollapsibleSection(key = "generic", title = "Weitere Geräte (HTTP / Webhook)") {
+    DeviceGroup(key = "generic", title = "Weitere Geräte (HTTP / Webhook)") {
         config.generics.forEach { g ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(g.name, color = TextPrim)
-                    Text("${g.method}  ${g.url}", color = TextSec, fontSize = 11.sp, maxLines = 1)
-                }
-                TextButton(onClick = {
-                    scope.launch {
-                        com.nahuel.homeflow.devices.GenericClient.fire(g.url, g.method, g.body)
-                            .onSuccess { onStatus("${g.name}: OK") }
-                            .onFailure { onStatus("${g.name}: ${it.message}") }
+            Column {
+                DeviceRow(name = g.name, meta = "${g.method}  ${g.url}", on = true) {
+                    GhostButton("Test") {
+                        scope.launch {
+                            com.nahuel.homeflow.devices.GenericClient.fire(g.url, g.method, g.body)
+                                .onSuccess { onStatus("${g.name}: OK") }
+                                .onFailure { onStatus("${g.name}: ${it.message}") }
+                        }
                     }
-                }) { Text("Test", color = Green, fontSize = 13.sp) }
-                IconButton(onClick = {
-                    Store.updateConfig { it.copy(generics = it.generics.filterNot { d -> d.name == g.name }) }
-                }) { Icon(Icons.Filled.Delete, "Entfernen", tint = TextSec) }
+                    IconBoxButton(26.dp, "Entfernen", onClick = {
+                        Store.updateConfig { it.copy(generics = it.generics.filterNot { d -> d.name == g.name }) }
+                    }) { Text("−", color = Ink, fontSize = 12.sp) }
+                }
+                Rule()
             }
         }
         if (config.generics.isEmpty())
             HintText("Beliebige Geräte per URL steuern: Shelly, Tasmota, Home Assistant, IFTTT. Trage Name und URL ein.")
+        Spacer(Modifier.height(12.dp))
+        FlatField("Name", name) { name = it }
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = name, onValueChange = { name = it },
-            label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(value = url, onValueChange = { url = it },
-            label = { Text("URL (http://...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(selected = !post, onClick = { post = false }, label = { Text("GET") })
-            Spacer(Modifier.width(8.dp))
-            FilterChip(selected = post, onClick = { post = true }, label = { Text("POST") })
-        }
+        FlatField("URL", url, placeholder = "http://…") { url = it }
+        Spacer(Modifier.height(10.dp))
+        SegmentedControl(listOf("GET", "POST"), if (post) 1 else 0) { post = it == 1 }
         if (post) {
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = body, onValueChange = { body = it },
-                label = { Text("Body (JSON, optional)") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            FlatField("Body (JSON, optional)", body) { body = it }
         }
         Spacer(Modifier.height(10.dp))
-        Button(
-            onClick = {
-                if (name.isNotBlank() && url.isNotBlank()) {
-                    Store.updateConfig { it.copy(generics = it.generics +
-                        GenericDevice(name.trim(), url.trim(), if (post) "POST" else "GET", body.trim())) }
-                    onStatus("${name.trim()} gespeichert")
-                    name = ""; url = ""; body = ""
-                } else onStatus("Name und URL eingeben.")
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Violet),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Gerät speichern", fontWeight = FontWeight.Medium) }
+        PrimaryButton("Gerät speichern", Modifier.fillMaxWidth()) {
+            if (name.isNotBlank() && url.isNotBlank()) {
+                Store.updateConfig {
+                    it.copy(
+                        generics = it.generics +
+                            GenericDevice(name.trim(), url.trim(), if (post) "POST" else "GET", body.trim())
+                    )
+                }
+                onStatus("${name.trim()} gespeichert")
+                name = ""; url = ""; body = ""
+            } else onStatus("Name und URL eingeben.")
+        }
     }
 }

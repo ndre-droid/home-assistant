@@ -5,10 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.border
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,10 +47,11 @@ fun ColorWheelDialog(initialHex: String?, onDismiss: () -> Unit, onPick: (String
 
     val preview = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, 1f)))
 
-    AlertDialog(
+    FlatDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        title = { Text("Farbe wählen", color = TextPrim) },
+        title = "Farbe wählen",
+        confirmButton = { GhostButton("Übernehmen") { onPick(currentHex()); onDismiss() } },
+        dismissButton = { GhostButton("Abbrechen", color = Muted, onClick = onDismiss) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
@@ -118,14 +117,10 @@ fun ColorWheelDialog(initialHex: String?, onDismiss: () -> Unit, onPick: (String
                     Modifier
                         .fillMaxWidth()
                         .height(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
                         .background(preview)
+                        .border(RuleWidth, Divider)
                 )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onPick(currentHex()); onDismiss() }) { Text("Übernehmen", color = Violet) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
+        }
     )
 }

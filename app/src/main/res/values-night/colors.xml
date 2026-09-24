@@ -1,0 +1,6 @@
+<resources>
+    <!-- Dark Modernist: ground and ink swap, the accent stays red. -->
+    <color name="window_bg">#201E1D</color>
+    <color name="widget_bg">#201E1D</color>
+    <color name="widget_text">#F3F2F2</color>
+</resources>

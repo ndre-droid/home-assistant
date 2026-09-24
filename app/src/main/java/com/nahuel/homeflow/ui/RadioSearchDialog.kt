@@ -3,11 +3,14 @@ package com.nahuel.homeflow.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nahuel.homeflow.devices.RadioBrowser
@@ -33,59 +36,47 @@ fun RadioSearchDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
         }
     }
 
-    AlertDialog(
+    FlatDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        title = { Text("Sounds & Sender suchen", color = TextPrim) },
+        title = "Sounds & Sender suchen",
+        dismissButton = { GhostButton("Schließen", color = Muted, onClick = onDismiss) },
         text = {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = query, onValueChange = { query = it },
-                        placeholder = { Text("z. B. birds, nature, rain, jazz") },
-                        modifier = Modifier.weight(1f), singleLine = true
-                    )
-                    TextButton(onClick = { runSearch() }, enabled = !busy) {
-                        Text(if (busy) "…" else "Suchen", color = Violet)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Box(Modifier.weight(1f)) {
+                        FlatField("Suche", query, placeholder = "z. B. birds, nature, rain, jazz") { query = it }
                     }
+                    Spacer(Modifier.width(8.dp))
+                    SecondaryButton(if (busy) "…" else "Suchen", enabled = !busy) { runSearch() }
+                }
+                Spacer(Modifier.height(10.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val quick = listOf("Natur", "Regen", "Meer", "Wald", "Jazz", "Lofi", "Klassik", "Chill", "News")
+                    items(quick) { q ->
+                        ChoiceChip(q, selected = query == q) { query = q; runSearch() }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (results === RadioBrowser.CURATED) Caption("Freie Sender – direkt spielbar auf Sonos:")
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(6.dp))
-                androidx.compose.foundation.lazy.LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val quick = listOf("Natur", "Regen", "Meer", "Wald", "Jazz", "Lofi", "Klassik", "Chill", "News")
-                    items(quick.size) { qi ->
-                        AssistChip(
-                            onClick = { query = quick[qi]; runSearch() },
-                            label = { Text(quick[qi], fontSize = 12.sp) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                if (results === RadioBrowser.CURATED)
-                    Text("Freie Sender – direkt spielbar auf Sonos:", color = TextSec, fontSize = 11.sp)
-                if (error.isNotEmpty()) Text(error, color = Pink, fontSize = 13.sp)
                 LazyColumn(Modifier.height(300.dp)) {
                     items(results, key = { it.url }) { st ->
                         Column(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable { onPick(st.url); onDismiss() }
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 9.dp)
                         ) {
-                            Text(st.name, color = TextPrim, fontSize = 14.sp)
-                            if (st.tags.isNotBlank()) {
-                                Text(
-                                    st.tags.take(60), color = TextSec, fontSize = 11.sp, maxLines = 1
-                                )
-                            }
+                            Text(st.name, color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            if (st.tags.isNotBlank()) Caption(st.tags.take(60))
                         }
-                        HorizontalDivider(color = Hairline)
+                        Rule()
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Schließen", color = TextSec) } }
+        }
     )
 }

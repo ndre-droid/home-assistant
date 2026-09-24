@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nahuel.homeflow.data.Routine
@@ -92,16 +89,16 @@ fun IconPickerDialog(
     onDismiss: () -> Unit,
     onPick: (String) -> Unit
 ) {
-    AlertDialog(
+    FlatDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface1,
-        title = { Text("Icon wählen", color = TextPrim) },
+        title = "Icon wählen",
+        confirmButton = { GhostButton("Automatisch", color = Muted) { onPick(""); onDismiss() } },
+        dismissButton = { GhostButton("Abbrechen", color = Muted, onClick = onDismiss) },
         text = {
             Column {
                 if (suggestion != null) {
-                    TextButton(onClick = { onPick(suggestion); onDismiss() }) {
-                        Text("Vorschlag: $suggestion  übernehmen", color = Violet)
-                    }
+                    SecondaryButton("Vorschlag $suggestion übernehmen") { onPick(suggestion); onDismiss() }
+                    Spacer(Modifier.height(10.dp))
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
@@ -110,21 +107,12 @@ fun IconPickerDialog(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(ICON_PACK) { emoji ->
-                        Box(
-                            Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Surface2)
-                                .bouncyClick { onPick(emoji); onDismiss() },
-                            contentAlignment = Alignment.Center
-                        ) { Text(emoji, fontSize = 20.sp) }
+                        IconBox(42.dp, Modifier.clickable { onPick(emoji); onDismiss() }) {
+                            Text(emoji, fontSize = 20.sp)
+                        }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onPick(""); onDismiss() }) { Text("Automatisch", color = TextSec) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSec) } }
+        }
     )
 }

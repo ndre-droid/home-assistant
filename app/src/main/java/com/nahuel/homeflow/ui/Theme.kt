@@ -2,83 +2,156 @@ package com.nahuel.homeflow.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nahuel.homeflow.R
 
-// ---- Brand palette: Spotify/YouTube language ----
-// Neutral near-black canvas, ONE saturated accent, gray steps for everything else.
-private val AccentGreen  = Color(0xFF1ED760)   // default accent (changeable in settings)
-private val BrandPink    = Color(0xFFF2649E)
-private val BrandGreenOk = Color(0xFF1ED760)
+// ---------------------------------------------------------------------------
+// Modernist design system
+// Flat, architectural, red-on-white. 2dp rules, zero corner radius, Archivo.
+// Ground #f3f2f2 / ink #201e1d / one accent #ec3013, each with a 100-900 ramp.
+// ---------------------------------------------------------------------------
 
-// Dark: YouTube's pure near-black + Spotify's gray steps. No blue tint, no borders.
-private val DarkScheme = darkColorScheme(
-    primary = AccentGreen,
-    onPrimary = Color(0xFF0D0D0D),         // black-on-green, like Spotify's play button
-    secondary = AccentGreen,
-    tertiary = BrandPink,
-    background = Color(0xFF0F0F0F),
-    onBackground = Color(0xFFF1F1F1),
-    surface = Color(0xFF1B1B1B),           // card step
-    onSurface = Color(0xFFF1F1F1),
-    surfaceVariant = Color(0xFF272727),    // chip/control step (YouTube chip gray)
-    onSurfaceVariant = Color(0xFFAAAAAA),  // muted text
-    outline = Color(0xFF2A2A2A),
-    outlineVariant = Color(0xFF232323),
-    error = Color(0xFFF26D6D)
+// Neutral ramp (light: 100 = near-white ... 900 = ink)
+private val N200 = Color(0xFFEBEAEA)
+private val N300 = Color(0xFFDCDBDA)
+private val N700 = Color(0xFF575453)
+private val N900 = Color(0xFF201E1D)
+
+// Accent ramp around #ec3013
+private val A100 = Color(0xFFFDE7E3)
+private val A200 = Color(0xFFFBCAC2)
+private val A400 = Color(0xFFF4715C)
+private val A500 = Color(0xFFEC3013)
+private val A700 = Color(0xFFAB220D)
+private val A900 = Color(0xFF5E1107)
+
+private val Ground = Color(0xFFF3F2F2)
+
+/** Archivo: headings and body both, per the design system. */
+private val Archivo = FontFamily(
+    Font(R.font.archivo_regular, FontWeight.Normal),
+    Font(R.font.archivo_medium, FontWeight.Medium),
+    Font(R.font.archivo_semibold, FontWeight.SemiBold),
+    Font(R.font.archivo_bold, FontWeight.Bold)
 )
 
-// Light: YouTube light — white canvas, gray chips, near-black text, deep green accent.
+private val ModernistType = Typography().run {
+    copy(
+        displayLarge = displayLarge.copy(fontFamily = Archivo),
+        displayMedium = displayMedium.copy(fontFamily = Archivo),
+        displaySmall = displaySmall.copy(fontFamily = Archivo),
+        headlineLarge = headlineLarge.copy(fontFamily = Archivo),
+        headlineMedium = headlineMedium.copy(fontFamily = Archivo),
+        headlineSmall = headlineSmall.copy(fontFamily = Archivo),
+        titleLarge = titleLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
+        titleMedium = titleMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
+        titleSmall = titleSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
+        bodyLarge = bodyLarge.copy(fontFamily = Archivo),
+        bodyMedium = bodyMedium.copy(fontFamily = Archivo),
+        bodySmall = bodySmall.copy(fontFamily = Archivo),
+        labelLarge = labelLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        labelMedium = labelMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        labelSmall = labelSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold)
+    )
+}
+
+// Light: the canonical Modernist scheme, ink on ground with one red accent.
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFF12833B),
+    primary = A500,
     onPrimary = Color.White,
-    secondary = Color(0xFF12833B),
-    tertiary = Color(0xFFC33C7E),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF0F0F0F),
-    surface = Color(0xFFF2F2F2),
-    onSurface = Color(0xFF0F0F0F),
-    surfaceVariant = Color(0xFFE5E5E5),
-    onSurfaceVariant = Color(0xFF606060),
-    outline = Color(0xFFDDDDDD),
-    outlineVariant = Color(0xFFE8E8E8),
-    error = Color(0xFFCC3D33)
+    primaryContainer = A100,
+    onPrimaryContainer = A900,
+    secondary = A700,
+    onSecondary = Color.White,
+    tertiary = N900,
+    onTertiary = Ground,
+    background = Ground,
+    onBackground = N900,
+    surface = Ground,
+    onSurface = N900,
+    surfaceVariant = N200,
+    onSurfaceVariant = N700,
+    outline = N900,          // rules are ink: structure, not decoration
+    outlineVariant = N300,
+    error = A700,
+    onError = Color.White
+)
+
+// Dark: the same system inverted. Ground and ink swap, the accent stays red but
+// steps one stop lighter so it still reads on a dark ground.
+private val DarkScheme = darkColorScheme(
+    primary = A500,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF3A1A14),
+    onPrimaryContainer = A200,
+    secondary = A400,
+    onSecondary = N900,
+    tertiary = Ground,
+    onTertiary = N900,
+    background = N900,
+    onBackground = Ground,
+    surface = N900,
+    onSurface = Ground,
+    surfaceVariant = Color(0xFF2B2928),
+    onSurfaceVariant = Color(0xFFA5A09E),
+    outline = Ground,
+    outlineVariant = Color(0xFF3A3736),
+    error = A400,
+    onError = N900
 )
 
 /** Theme mode preference. Stored in Config.themeMode. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-// ---- Theme-aware tokens (all screens reference these) ----
-val Bg: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background
-val Surface1: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surface
-val Surface2: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceVariant
-val Violet: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primary
-val Blue: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondary
-val Pink: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.tertiary
-val Green: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primary
-val TextPrim: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurface
-val TextSec: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurfaceVariant
-val Hairline: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline
+// ---- Modernist tokens (every screen references these) ----
 
-val CardGradient: Brush
-    @Composable @ReadOnlyComposable get() {
-        val s = MaterialTheme.colorScheme.surface
-        return Brush.verticalGradient(listOf(s, s))
-    }
-val AccentGradient: Brush
-    @Composable @ReadOnlyComposable get() =
-        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary))
+/** Page ground. */
+val Bg: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background
+
+/** Ink: body text, rules, borders. */
+val Ink: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onBackground
+
+/** The single accent. */
+val Accent: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primary
+
+/** Accent text on a tint or an active tab: accent-700 in light, accent-400 in dark. */
+val AccentText: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondary
+
+/** Accent-100 tint: selected rows, subtle fills. */
+val AccentTint: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primaryContainer
+
+/** Every rule and border in the system. Always RuleWidth, always this colour. */
+val Divider: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline
+
+/** Block fill under branch headers and inert bars (neutral-200). */
+val Fill: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceVariant
+
+/** Muted copy: captions, meta, section labels (neutral-700). */
+val Muted: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurfaceVariant
+
+/** Inactive state dot, disabled glyph (neutral-400). */
+val Faint: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outlineVariant
+
+/** The one rule weight in the system. */
+val RuleWidth = 2.dp
+
+/** Zero radius, everywhere. */
+val Square = RectangleShape
 
 @Composable
 fun HomeFlowTheme(
@@ -99,7 +172,7 @@ fun HomeFlowTheme(
         dark -> DarkScheme
         else -> LightScheme
     }
-    // Custom accent (settings picker) overrides primary when dynamic color is off.
+    // Custom accent (settings picker) overrides the red when dynamic colour is off.
     val accent = runCatching {
         if (accentHex.length == 7 && accentHex.startsWith("#") && !dynamicColor)
             Color(android.graphics.Color.parseColor(accentHex)) else null
@@ -107,15 +180,18 @@ fun HomeFlowTheme(
     val scheme = if (accent != null) base.copy(
         primary = accent,
         secondary = accent,
-        // keep icon/text on the accent readable for light accents
-        onPrimary = if (accentIsLight(accent)) Color(0xFF0D0D0D) else Color.White
+        onPrimary = if (accentIsLight(accent)) N900 else Color.White
     ) else base
     MaterialTheme(
         colorScheme = scheme,
+        typography = ModernistType,
+        // Zero radius is a rule of the system, not a preference.
         shapes = Shapes(
-            small = RoundedCornerShape(14.dp),
-            medium = RoundedCornerShape(18.dp),
-            large = RoundedCornerShape(24.dp)
+            extraSmall = RectangleShape,
+            small = RectangleShape,
+            medium = RectangleShape,
+            large = RectangleShape,
+            extraLarge = RectangleShape
         ),
         content = content
     )

@@ -157,7 +157,7 @@ private fun AppRoot(
         Scaffold(
             containerColor = Bg,
             bottomBar = {
-                SlimNavBar(
+                FlatNavBar(
                     labels = Tab.entries.map { it.label },
                     current = tab.ordinal,
                     onSelect = { tab = Tab.entries[it] }
@@ -174,11 +174,13 @@ private fun AppRoot(
     }
 
     if (nfcWriteRoutineId != null) {
-        AlertDialog(
+        FlatDialog(
             onDismissRequest = onCancelNfcWrite,
-            confirmButton = { TextButton(onClick = onCancelNfcWrite) { Text("Abbrechen") } },
-            title = { Text("NFC-Tag beschreiben") },
-            text = { Text("Halte jetzt den NFC-Tag an die Rückseite deines Handys. Der Tag startet danach diese Automation – auch wenn die App geschlossen ist.") }
+            title = "NFC-Tag beschreiben",
+            confirmButton = { GhostButton("Abbrechen", color = Muted, onClick = onCancelNfcWrite) },
+            text = {
+                Caption("Halte jetzt den NFC-Tag an die Rückseite deines Handys. Der Tag startet danach diese Automation – auch wenn die App geschlossen ist.")
+            }
         )
     }
 }

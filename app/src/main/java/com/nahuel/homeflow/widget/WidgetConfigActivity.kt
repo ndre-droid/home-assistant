@@ -5,15 +5,11 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,50 +37,70 @@ class WidgetConfigActivity : ComponentActivity() {
                 var selected by remember { mutableStateOf(listOf<String>()) }
                 var iconMode by remember { mutableStateOf(false) }
 
-                Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
-                    Text("Automationen wählen (max. 8)",
-                        color = TextPrim, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Reihenfolge = Button-Reihenfolge. Tippe zum Hinzufügen/Entfernen.",
-                        color = TextSec, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
+                Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding()) {
+                    TopBar("Automationen wählen")
+                    Caption(
+                        "Maximal 8. Reihenfolge = Button-Reihenfolge. Tippe zum Hinzufügen/Entfernen.",
+                        Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                    Rule()
 
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
+                    LazyColumn(Modifier.weight(1f)) {
                         items(routines, key = { it.id }) { r ->
                             val idx = selected.indexOf(r.id)
                             val isSel = idx >= 0
-                            GradientCard(Modifier.clickable {
-                                selected = when {
-                                    isSel -> selected - r.id
-                                    selected.size < 8 -> selected + r.id
-                                    else -> selected
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(if (isSel) AccentTint else Bg)
+                                        .clickable {
+                                            selected = when {
+                                                isSel -> selected - r.id
+                                                selected.size < 8 -> selected + r.id
+                                                else -> selected
+                                            }
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                                ) {
+                                    IconBox(30.dp) { Text(routineIcon(r), fontSize = 15.sp) }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        r.name,
+                                        color = if (isSel) AccentText else Ink,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSel) {
+                                        IconBox(22.dp) {
+                                            Text(
+                                                "${idx + 1}", color = AccentText,
+                                                fontSize = 11.sp, fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
                                 }
-                            }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(r.name, color = if (isSel) Violet else TextPrim,
-                                        fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                    if (isSel) Text("${idx + 1}", color = Violet, fontWeight = FontWeight.Bold)
-                                }
+                                Rule()
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Icons statt Namen", color = TextPrim, fontWeight = FontWeight.SemiBold)
-                            Text("Buttons zeigen das Automations-Icon", color = TextSec, fontSize = 12.sp)
+                    Section {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text("Icons statt Namen", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Caption("Buttons zeigen das Automations-Icon")
+                            }
+                            FlatToggle(iconMode) { iconMode = it }
                         }
-                        Switch(
-                            checked = iconMode, onCheckedChange = { iconMode = it },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Violet)
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = {
+                        Spacer(Modifier.height(12.dp))
+                        PrimaryButton(
+                            "Widget erstellen (${selected.size})",
+                            Modifier.fillMaxWidth(),
+                            enabled = selected.isNotEmpty()
+                        ) {
                             RoutineWidget.saveMapping(this@WidgetConfigActivity, widgetId, selected)
                             RoutineWidget.saveIconMode(this@WidgetConfigActivity, widgetId, iconMode)
                             RoutineWidget.update(
@@ -93,11 +109,8 @@ class WidgetConfigActivity : ComponentActivity() {
                             )
                             setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
                             finish()
-                        },
-                        enabled = selected.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Violet),
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Widget erstellen (${selected.size})") }
+                        }
+                    }
                 }
             }
         }
