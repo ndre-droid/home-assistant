@@ -2,6 +2,7 @@ package com.nahuel.homeflow.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -153,6 +154,9 @@ val RuleWidth = 2.dp
 /** Zero radius, everywhere. */
 val Square = RectangleShape
 
+/** Material's Shapes slots need a CornerBasedShape, so zero radius is spelled out. */
+private val NoCorners = RoundedCornerShape(0.dp)
+
 @Composable
 fun HomeFlowTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -187,11 +191,11 @@ fun HomeFlowTheme(
         typography = ModernistType,
         // Zero radius is a rule of the system, not a preference.
         shapes = Shapes(
-            extraSmall = RectangleShape,
-            small = RectangleShape,
-            medium = RectangleShape,
-            large = RectangleShape,
-            extraLarge = RectangleShape
+            extraSmall = NoCorners,
+            small = NoCorners,
+            medium = NoCorners,
+            large = NoCorners,
+            extraLarge = NoCorners
         ),
         content = content
     )

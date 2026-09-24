@@ -416,12 +416,13 @@ fun EditRoutineScreen(routineId: String?, onClose: () -> Unit, onRequestNfcWrite
 /** Wrapping row of chips — the builder offers more choices than fit one line. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChipFlow(content: @Composable FlowRowScope.() -> Unit) {
+private fun ChipFlow(content: @Composable () -> Unit) {
+    // Content takes no receiver on purpose: FlowRowScope is experimental and
+    // would otherwise leak the opt-in requirement to every call site.
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        content = content
-    )
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) { content() }
 }
 
 @Composable

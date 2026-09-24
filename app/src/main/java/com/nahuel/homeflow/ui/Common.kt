@@ -231,6 +231,43 @@ fun FlatToggle(
 
 // ---- Tags, fields, segmented control ---------------------------------------
 
+/**
+ * Selectable chip, the flat replacement for FilterChip: ink border, accent fill
+ * when selected. Used wherever the builder offers a set of choices.
+ */
+@Composable
+fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    trailing: String? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier
+            .background(if (selected) Accent else Bg)
+            .border(RuleWidth, Divider)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else Ink,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                trailing,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else Muted,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
 /** Small square status dot: accent when live, neutral when not. */
 @Composable
 fun StatusDot(on: Boolean, modifier: Modifier = Modifier) {
