@@ -17,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.ui.HomeFlowTheme
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
@@ -30,6 +29,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.nahuel.homeflow.engine.TriggerService
 import com.nahuel.homeflow.ui.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 class MainActivity : ComponentActivity() {
 
@@ -132,7 +147,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { AUTOMATIONS("Automationen"), DEVICES("Geräte"), SETTINGS("Einstellungen") }
+private enum class Tab(val label: String, val icon: ImageVector) {
+    HOME("Home", Icons.Outlined.Home),
+    AUTOMATIONS("Automationen", Icons.Outlined.Bolt),
+    DEVICES("Geräte", Icons.Outlined.GridView),
+    SETTINGS("Einstellungen", Icons.Outlined.Tune)
+}
 
 @Composable
 private fun AppRoot(
@@ -140,35 +160,89 @@ private fun AppRoot(
     onRequestNfcWrite: (String) -> Unit,
     onCancelNfcWrite: () -> Unit
 ) {
-    var tab by remember { mutableStateOf(Tab.AUTOMATIONS) }
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var roomId by rememberSaveable { mutableStateOf<String?>(null) }
     var editRoutineId by remember { mutableStateOf<String?>(null) }   // null = list, "" = new
     var showEditor by remember { mutableStateOf(false) }
     var showCapture by remember { mutableStateOf(false) }
+    val rooms by HomeRepo.rooms.collectAsState()
+    val cfg by Store.config.collectAsState()
 
-    if (showCapture) {
-        SceneCaptureScreen(onClose = { showCapture = false })
-    } else if (showEditor) {
-        EditRoutineScreen(
-            routineId = editRoutineId,
-            onClose = { showEditor = false },
-            onRequestNfcWrite = onRequestNfcWrite
-        )
-    } else {
-        Scaffold(
-            containerColor = Bg,
-            bottomBar = {
-                FlatNavBar(
-                    labels = Tab.entries.map { it.label },
-                    current = tab.ordinal,
-                    onSelect = { tab = Tab.entries[it] }
-                )
+    // Live device state while the app is visible: full probe on start, then light polling.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            HomeRepo.refresh(includeTv = true)
+            var n = 0
+            while (isActive) {
+                delay(6_000)
+                n++
+                HomeRepo.refresh(includeTv = n % 5 == 0)
             }
-        ) { pad ->
-            val mod = Modifier.padding(pad)
-            when (tab) {
-                Tab.AUTOMATIONS -> AutomationsScreen(mod, onEdit = { id -> editRoutineId = id; showEditor = true }, onCaptureScene = { showCapture = true })
-                Tab.DEVICES -> DevicesScreen(mod)
-                Tab.SETTINGS -> SettingsScreen(mod)
+        }
+    }
+    LaunchedEffect(cfg) { HomeRepo.rebuild() }
+
+    val navItems = Tab.entries.map { NavItem(it.label, it.icon) }
+    val selectTab: (Int) -> Unit = { i ->
+        val t = Tab.entries[i]
+        if (t == tab && t == Tab.HOME) roomId = null   // tapping Home again goes back to the overview
+        tab = t
+    }
+
+    @Composable
+    fun TabContent(t: Tab, mod: Modifier, wide: Boolean) {
+        when (t) {
+            Tab.HOME -> HomeScreen(
+                mod,
+                selectedRoomId = if (wide) (roomId ?: rooms.firstOrNull()?.id) else null,
+                onOpenRoom = { roomId = it },
+                onOpenAutomations = { tab = Tab.AUTOMATIONS },
+                onOpenDevices = { tab = Tab.DEVICES }
+            )
+            Tab.AUTOMATIONS -> AutomationsScreen(
+                mod,
+                onEdit = { id -> editRoutineId = id; showEditor = true },
+                onCaptureScene = { showCapture = true }
+            )
+            Tab.DEVICES -> DevicesScreen(mod)
+            Tab.SETTINGS -> SettingsScreen(mod)
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(Bg)) {
+        val wide = maxWidth >= 600.dp
+        when {
+            showCapture -> SceneCaptureScreen(onClose = { showCapture = false })
+            showEditor -> EditRoutineScreen(
+                routineId = editRoutineId,
+                onClose = { showEditor = false },
+                onRequestNfcWrite = onRequestNfcWrite
+            )
+            wide -> Row(Modifier.fillMaxSize().navigationBarsPadding()) {
+                FlatNavRail(navItems, tab.ordinal, selectTab)
+                if (tab == Tab.HOME) {
+                    val sel = roomId?.takeIf { id -> rooms.any { it.id == id } } ?: rooms.firstOrNull()?.id
+                    TabContent(Tab.HOME, Modifier.width(380.dp).fillMaxHeight(), wide = true)
+                    Box(Modifier.fillMaxHeight().width(RuleWidth).background(Divider))
+                    if (sel != null) RoomScreen(sel, Modifier.weight(1f).fillMaxHeight(), onBack = null)
+                    else Box(Modifier.weight(1f).fillMaxHeight().background(Bg))
+                } else {
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                        TabContent(tab, Modifier.widthIn(max = 720.dp), wide = true)
+                    }
+                }
+            }
+            tab == Tab.HOME && roomId != null -> {
+                BackHandler { roomId = null }
+                RoomScreen(roomId!!, Modifier.fillMaxSize(), onBack = { roomId = null })
+            }
+            else -> Scaffold(
+                containerColor = Bg,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = { FlatNavBar(navItems, tab.ordinal, selectTab) }
+            ) { pad ->
+                TabContent(tab, Modifier.padding(pad), wide = false)
             }
         }
     }

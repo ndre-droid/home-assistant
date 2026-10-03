@@ -16,8 +16,12 @@ import org.json.JSONObject
 data class HueLight(
     val id: String, val name: String, val on: Boolean, val supportsColor: Boolean,
     val brightness: Int = 100,          // 1..100
-    val colorHex: String? = null        // current color, if the light has one
+    val colorHex: String? = null,       // current color, if the light has one
+    val ownerId: String = ""            // Hue device id that owns this light (room membership)
 )
+
+/** A Hue room: name plus the device ids it contains (lights link to it via ownerId). */
+data class HueRoom(val id: String, val name: String, val deviceIds: Set<String>)
 
 /** Philips Hue bridge, local CLIP v2 API. Latency on LAN: typically < 100 ms. */
 /** Remembers which lights WE just commanded, so the event stream can tell
@@ -69,7 +73,27 @@ object HueClient {
                         on = l.optJSONObject("on")?.optBoolean("on") ?: false,
                         supportsColor = l.has("color"),
                         brightness = (l.optJSONObject("dimming")?.optDouble("brightness", 100.0) ?: 100.0).toInt().coerceIn(1, 100),
-                        colorHex = xy?.let { c -> xyToHex(c.optDouble("x", 0.3127), c.optDouble("y", 0.3290)) }
+                        colorHex = xy?.let { c -> xyToHex(c.optDouble("x", 0.3127), c.optDouble("y", 0.3290)) },
+                        ownerId = l.optJSONObject("owner")?.optString("rid") ?: ""
+                    )
+                }
+            }
+        }
+    }
+
+    /** Rooms as configured in the Hue app. Children are device ids (lights point to them via owner). */
+    suspend fun rooms(): Result<List<HueRoom>> = withContext(Dispatchers.IO) {
+        runCatching {
+            Http.local.newCall(v2("resource/room").get().build()).execute().use { resp ->
+                check(resp.isSuccessful) { "Bridge HTTP ${resp.code}" }
+                val data = JSONObject(resp.body!!.string()).getJSONArray("data")
+                (0 until data.length()).map { i ->
+                    val r = data.getJSONObject(i)
+                    val kids = r.optJSONArray("children") ?: JSONArray()
+                    HueRoom(
+                        id = r.getString("id"),
+                        name = r.optJSONObject("metadata")?.optString("name") ?: "Raum",
+                        deviceIds = (0 until kids.length()).map { kids.getJSONObject(it).optString("rid") }.toSet()
                     )
                 }
             }

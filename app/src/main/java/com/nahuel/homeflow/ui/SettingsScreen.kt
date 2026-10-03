@@ -1,5 +1,7 @@
 package com.nahuel.homeflow.ui
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -61,24 +63,25 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 SectionLabel("Akzentfarbe")
                 Spacer(Modifier.height(8.dp))
                 val presets = listOf(
-                    "" to "Standard", "#3B6EF5" to "Blau", "#7C74E8" to "Violett",
-                    "#1D9E75" to "Teal", "#E0A558" to "Amber", "#EC5F9E" to "Pink"
+                    "" to "Bernstein", "#8FB8FF" to "Blau", "#7FD1AE" to "Mint",
+                    "#A79BFF" to "Violett", "#F2A0B8" to "Rosé", "#E8E4DC" to "Weiß"
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    presets.forEach { (hex, _) ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    presets.forEach { (hex, label) ->
                         val selected = config.accentColor == hex
                         val swatch =
-                            if (hex.isEmpty()) Color(0xFFEC3013) else Color(android.graphics.Color.parseColor(hex))
+                            if (hex.isEmpty()) Color(0xFFF0B45E) else Color(android.graphics.Color.parseColor(hex))
                         Box(
                             Modifier
-                                .size(30.dp)
+                                .size(36.dp)
+                                .then(if (selected) Modifier.border(2.dp, Ink, CircleShape).padding(4.dp) else Modifier)
+                                .clip(CircleShape)
                                 .background(swatch)
-                                .border(if (selected) RuleWidth else 1.dp, if (selected) Ink else Faint)
-                                .clickable { Store.updateConfig { it.copy(accentColor = hex) } }
+                                .clickable(onClickLabel = label) { Store.updateConfig { it.copy(accentColor = hex) } }
                         )
                     }
-                    IconBoxButton(30.dp, "Eigene Farbe", onClick = { showAccentWheel = true }) {
-                        Text("+", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    IconBoxButton(36.dp, "Eigene Farbe", onClick = { showAccentWheel = true }) {
+                        Text("+", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 

@@ -177,7 +177,7 @@ data class Config(
     val myPhoneIp: String = "",                  // your phone IP for leave-wifi detection
     val themeMode: ThemeMode = ThemeMode.SYSTEM, // appearance: follow system / light / dark
     val dynamicColor: Boolean = false,           // Material You wallpaper colors (Android 12+)
-    val accentColor: String = "",                // custom accent hex (#RRGGBB); empty = default blue
+    val accentColor: String = "",                // custom accent hex (#RRGGBB); empty = default amber
     val generics: List<GenericDevice> = emptyList(), // user HTTP/webhook devices
     val latitude: Double = 52.52,                // for sunrise/sunset (default Berlin)
     val longitude: Double = 13.405,
@@ -188,7 +188,8 @@ data class Config(
     val geofenceRadius: Int = 150,               // meters
     val spotifyClientId: String = "",            // user's own Spotify dev app
     val spotifyRefresh: String = "",             // OAuth refresh token ("" = not connected)
-    val spotifyVerifier: String = ""             // transient PKCE verifier during login
+    val spotifyVerifier: String = "",            // transient PKCE verifier during login
+    val deviceRooms: Map<String, String> = emptyMap() // Sonos/TV IP -> Hue room id (Home tab grouping)
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -214,6 +215,7 @@ data class Config(
         put("homeLat", homeLat); put("homeLon", homeLon); put("geofenceRadius", geofenceRadius)
         put("spotifyClientId", spotifyClientId); put("spotifyRefresh", spotifyRefresh); put("spotifyVerifier", spotifyVerifier)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
+        put("deviceRooms", JSONObject().also { o -> deviceRooms.forEach { (k, v) -> o.put(k, v) } })
     }
 
     companion object {
@@ -269,7 +271,10 @@ data class Config(
                 geofenceRadius = o.optInt("geofenceRadius", 150),
                 spotifyClientId = o.optString("spotifyClientId", ""),
                 spotifyRefresh = o.optString("spotifyRefresh", ""),
-                spotifyVerifier = o.optString("spotifyVerifier", "")
+                spotifyVerifier = o.optString("spotifyVerifier", ""),
+                deviceRooms = o.optJSONObject("deviceRooms")?.let { m ->
+                    m.keys().asSequence().associateWith { k -> m.optString(k) }
+                } ?: emptyMap()
             )
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -22,28 +23,36 @@ import androidx.compose.ui.unit.dp
 import com.nahuel.homeflow.R
 
 // ---------------------------------------------------------------------------
-// Modernist design system
-// Flat, architectural, red-on-white. 2dp rules, zero corner radius, Archivo.
-// Ground #f3f2f2 / ink #201e1d / one accent #ec3013, each with a 100-900 ramp.
+// Calm dark design system
+// Near-black ground (OLED friendly), two layered surfaces, rounded cards,
+// one warm accent (the colour of light). Archivo throughout.
+// A light variant with the same structure exists for "Hell" in settings.
 // ---------------------------------------------------------------------------
 
-// Neutral ramp (light: 100 = near-white ... 900 = ink)
-private val N200 = Color(0xFFEBEAEA)
-private val N300 = Color(0xFFDCDBDA)
-private val N700 = Color(0xFF575453)
-private val N900 = Color(0xFF201E1D)
+// Dark
+private val Ground = Color(0xFF0C0D0E)
+private val Surface1 = Color(0xFF16181A)
+private val Surface2 = Color(0xFF1F2225)
+private val Line = Color(0xFF23272A)
+private val InkD = Color(0xFFEDEBE7)
+private val MutedD = Color(0xFFA3A19C)
+private val FaintD = Color(0xFF5C5F62)
+private val Amber = Color(0xFFF0B45E)
+private val OnAmber = Color(0xFF17130A)
+private val ErrorD = Color(0xFFFF8A7A)
 
-// Accent ramp around #ec3013
-private val A100 = Color(0xFFFDE7E3)
-private val A200 = Color(0xFFFBCAC2)
-private val A400 = Color(0xFFF4715C)
-private val A500 = Color(0xFFEC3013)
-private val A700 = Color(0xFFAB220D)
-private val A900 = Color(0xFF5E1107)
+// Light
+private val GroundL = Color(0xFFF4F3F0)
+private val Surface1L = Color(0xFFFFFFFF)
+private val Surface2L = Color(0xFFECEAE6)
+private val LineL = Color(0xFFE2E0DB)
+private val InkL = Color(0xFF1A1B1C)
+private val MutedL = Color(0xFF5F5D59)
+private val FaintL = Color(0xFFB5B2AC)
+private val AmberL = Color(0xFFA35F0C)
+private val ErrorL = Color(0xFFB3261E)
 
-private val Ground = Color(0xFFF3F2F2)
-
-/** Archivo: headings and body both, per the design system. */
+/** Archivo: headings and body both. */
 private val Archivo = FontFamily(
     Font(R.font.archivo_regular, FontWeight.Normal),
     Font(R.font.archivo_medium, FontWeight.Medium),
@@ -51,111 +60,126 @@ private val Archivo = FontFamily(
     Font(R.font.archivo_bold, FontWeight.Bold)
 )
 
-private val ModernistType = Typography().run {
+private val CalmType = Typography().run {
     copy(
         displayLarge = displayLarge.copy(fontFamily = Archivo),
         displayMedium = displayMedium.copy(fontFamily = Archivo),
         displaySmall = displaySmall.copy(fontFamily = Archivo),
-        headlineLarge = headlineLarge.copy(fontFamily = Archivo),
-        headlineMedium = headlineMedium.copy(fontFamily = Archivo),
-        headlineSmall = headlineSmall.copy(fontFamily = Archivo),
-        titleLarge = titleLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
-        titleMedium = titleMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
-        titleSmall = titleSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.Bold),
+        headlineLarge = headlineLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        headlineMedium = headlineMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        headlineSmall = headlineSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        titleLarge = titleLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        titleMedium = titleMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
+        titleSmall = titleSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
         bodyLarge = bodyLarge.copy(fontFamily = Archivo),
         bodyMedium = bodyMedium.copy(fontFamily = Archivo),
         bodySmall = bodySmall.copy(fontFamily = Archivo),
         labelLarge = labelLarge.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
-        labelMedium = labelMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold),
-        labelSmall = labelSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.SemiBold)
+        labelMedium = labelMedium.copy(fontFamily = Archivo, fontWeight = FontWeight.Medium),
+        labelSmall = labelSmall.copy(fontFamily = Archivo, fontWeight = FontWeight.Medium)
     )
 }
 
-// Light: the canonical Modernist scheme, ink on ground with one red accent.
-private val LightScheme = lightColorScheme(
-    primary = A500,
-    onPrimary = Color.White,
-    primaryContainer = A100,
-    onPrimaryContainer = A900,
-    secondary = A700,
-    onSecondary = Color.White,
-    tertiary = N900,
+private val DarkScheme = darkColorScheme(
+    primary = Amber,
+    onPrimary = OnAmber,
+    primaryContainer = Color(0xFF2B2216),
+    onPrimaryContainer = Amber,
+    secondary = Amber,
+    onSecondary = OnAmber,
+    tertiary = InkD,
     onTertiary = Ground,
     background = Ground,
-    onBackground = N900,
-    surface = Ground,
-    onSurface = N900,
-    surfaceVariant = N200,
-    onSurfaceVariant = N700,
-    outline = N900,          // rules are ink: structure, not decoration
-    outlineVariant = N300,
-    error = A700,
-    onError = Color.White
+    onBackground = InkD,
+    surface = Surface1,
+    onSurface = InkD,
+    surfaceVariant = Surface2,
+    onSurfaceVariant = MutedD,
+    surfaceContainerLowest = Ground,
+    surfaceContainerLow = Surface1,
+    surfaceContainer = Surface1,
+    surfaceContainerHigh = Surface2,
+    surfaceContainerHighest = Surface2,
+    outline = Line,
+    outlineVariant = FaintD,
+    error = ErrorD,
+    onError = Ground
 )
 
-// Dark: the same system inverted. Ground and ink swap, the accent stays red but
-// steps one stop lighter so it still reads on a dark ground.
-private val DarkScheme = darkColorScheme(
-    primary = A500,
+private val LightScheme = lightColorScheme(
+    primary = AmberL,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF3A1A14),
-    onPrimaryContainer = A200,
-    secondary = A400,
-    onSecondary = N900,
-    tertiary = Ground,
-    onTertiary = N900,
-    background = N900,
-    onBackground = Ground,
-    surface = N900,
-    onSurface = Ground,
-    surfaceVariant = Color(0xFF2B2928),
-    onSurfaceVariant = Color(0xFFA5A09E),
-    outline = Ground,
-    outlineVariant = Color(0xFF3A3736),
-    error = A400,
-    onError = N900
+    primaryContainer = Color(0xFFF6E7D2),
+    onPrimaryContainer = Color(0xFF5A3405),
+    secondary = AmberL,
+    onSecondary = Color.White,
+    tertiary = InkL,
+    onTertiary = GroundL,
+    background = GroundL,
+    onBackground = InkL,
+    surface = Surface1L,
+    onSurface = InkL,
+    surfaceVariant = Surface2L,
+    onSurfaceVariant = MutedL,
+    surfaceContainerLowest = GroundL,
+    surfaceContainerLow = Surface1L,
+    surfaceContainer = Surface1L,
+    surfaceContainerHigh = Surface2L,
+    surfaceContainerHighest = Surface2L,
+    outline = LineL,
+    outlineVariant = FaintL,
+    error = ErrorL,
+    onError = Color.White
 )
 
 /** Theme mode preference. Stored in Config.themeMode. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-// ---- Modernist tokens (every screen references these) ----
+// ---- Tokens (every screen references these) ----
 
 /** Page ground. */
 val Bg: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background
 
-/** Ink: body text, rules, borders. */
+/** Card surface, one step above the ground. */
+val Card: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surface
+
+/** Inset fill inside cards: fields, icon tiles, secondary buttons (surface 2). */
+val Fill: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceVariant
+
+/** Primary text. */
 val Ink: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onBackground
 
 /** The single accent. */
 val Accent: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primary
 
-/** Accent text on a tint or an active tab: accent-700 in light, accent-400 in dark. */
+/** Accent used as text on ground or cards. */
 val AccentText: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondary
 
-/** Accent-100 tint: selected rows, subtle fills. */
+/** Accent tint: selected rows, banners. */
 val AccentTint: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.primaryContainer
 
-/** Every rule and border in the system. Always RuleWidth, always this colour. */
+/** Hairline separators. */
 val Divider: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline
 
-/** Block fill under branch headers and inert bars (neutral-200). */
-val Fill: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceVariant
-
-/** Muted copy: captions, meta, section labels (neutral-700). */
+/** Muted copy: captions, meta. */
 val Muted: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurfaceVariant
 
-/** Inactive state dot, disabled glyph (neutral-400). */
+/** Inactive dots, disabled glyphs, placeholder rings. */
 val Faint: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outlineVariant
 
-/** The one rule weight in the system. */
-val RuleWidth = 2.dp
+/** Errors and failed runs. */
+val Danger: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.error
 
-/** Zero radius, everywhere. */
+/** Hairline weight. */
+val RuleWidth = 1.dp
+
+/** Kept for call sites that need a hard edge. */
 val Square = RectangleShape
 
-/** Material's Shapes slots need a CornerBasedShape, so zero radius is spelled out. */
-private val NoCorners = RoundedCornerShape(0.dp)
+val CardShape = RoundedCornerShape(22.dp)
+val TileShape = RoundedCornerShape(16.dp)
+val FieldShape = RoundedCornerShape(14.dp)
+val PillShape = RoundedCornerShape(percent = 50)
 
 @Composable
 fun HomeFlowTheme(
@@ -171,31 +195,43 @@ fun HomeFlowTheme(
     }
     val ctx = LocalContext.current
     val base = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            // Wallpaper accent, but keep our calm grounds and surfaces.
+            val dyn = if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+            val b = if (dark) DarkScheme else LightScheme
+            b.copy(
+                primary = dyn.primary, onPrimary = dyn.onPrimary,
+                secondary = dyn.primary, onSecondary = dyn.onPrimary,
+                primaryContainer = dyn.primary.copy(alpha = 0.16f).compositeOver(b.background),
+                onPrimaryContainer = dyn.primary
+            )
+        }
         dark -> DarkScheme
         else -> LightScheme
     }
-    // Custom accent (settings picker) overrides the red when dynamic colour is off.
+    // Custom accent (settings picker) overrides the amber when dynamic colour is off.
     val accent = runCatching {
         if (accentHex.length == 7 && accentHex.startsWith("#") && !dynamicColor)
             Color(android.graphics.Color.parseColor(accentHex)) else null
     }.getOrNull()
-    val scheme = if (accent != null) base.copy(
-        primary = accent,
-        secondary = accent,
-        onPrimary = if (accentIsLight(accent)) N900 else Color.White
-    ) else base
+    val scheme = if (accent != null) {
+        val on = if (accentIsLight(accent)) OnAmber else Color.White
+        base.copy(
+            primary = accent, onPrimary = on,
+            secondary = accent, onSecondary = on,
+            primaryContainer = accent.copy(alpha = 0.16f).compositeOver(base.background),
+            onPrimaryContainer = accent
+        )
+    } else base
     MaterialTheme(
         colorScheme = scheme,
-        typography = ModernistType,
-        // Zero radius is a rule of the system, not a preference.
+        typography = CalmType,
         shapes = Shapes(
-            extraSmall = NoCorners,
-            small = NoCorners,
-            medium = NoCorners,
-            large = NoCorners,
-            extraLarge = NoCorners
+            extraSmall = RoundedCornerShape(8.dp),
+            small = RoundedCornerShape(12.dp),
+            medium = RoundedCornerShape(16.dp),
+            large = RoundedCornerShape(22.dp),
+            extraLarge = RoundedCornerShape(28.dp)
         ),
         content = content
     )
