@@ -1,6 +1,7 @@
 <resources>
-    <!-- Dark Modernist: ground and ink swap, the accent stays red. -->
-    <color name="window_bg">#201E1D</color>
-    <color name="widget_bg">#201E1D</color>
-    <color name="widget_text">#F3F2F2</color>
+    <!-- Calm dark: near-black ground, raised widget surface, bright amber accent. -->
+    <color name="window_bg">#0C0D0E</color>
+    <color name="widget_bg">#16181A</color>
+    <color name="widget_text">#EDEBE7</color>
+    <color name="accent">#F0B45E</color>
 </resources>

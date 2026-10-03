@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HomeFlow – Handbuch</title>
+<title>SmartFlow – Handbuch</title>
 <style>
-  /* Modernist: flat, red-on-ground, 2px rules, zero radius. */
+  /* Calm: warm ground, one amber accent (matches the app). */
   :root{
-    --bg:#F3F2F2; --card:#F3F2F2; --card2:#EBEAEA;
-    --blue:#AB220D; --violet:#AB220D; --pink:#AB220D; --green:#AB220D;
-    --accent:#EC3013; --text:#201E1D; --sec:#575453; --line:#201E1D;
+    --bg:#F4F3F0; --card:#FFFFFF; --card2:#ECEAE6;
+    --blue:#A35F0C; --violet:#A35F0C; --pink:#A35F0C; --green:#A35F0C;
+    --accent:#A35F0C; --text:#1A1B1C; --sec:#5F5D59; --line:#E2E0DB;
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --bg:#201E1D; --card:#201E1D; --card2:#2B2928;
-      --blue:#F4715C; --violet:#F4715C; --pink:#F4715C; --green:#F4715C;
-      --text:#F3F2F2; --sec:#A5A09E; --line:#F3F2F2;
+      --bg:#0C0D0E; --card:#16181A; --card2:#1F2225;
+      --blue:#F0B45E; --violet:#F0B45E; --pink:#F0B45E; --green:#F0B45E;
+      --accent:#F0B45E; --text:#EDEBE7; --sec:#A3A19C; --line:#23272A;
     }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -40,7 +40,7 @@
 </head>
 <body>
 <header>
-  <h1>HomeFlow Handbuch</h1>
+  <h1>SmartFlow Handbuch</h1>
   <p>Alles, was die App kann – kurz erklärt.</p>
 </header>
 
@@ -96,24 +96,33 @@
 
 <section>
   <h2>Widget</h2>
-  <p>Homescreen lange drücken → Widgets → HomeFlow. Beim Platzieren bis zu 8 Automationen wählen. Das Widget ist in beide Richtungen größenveränderbar – je größer, desto mehr Knöpfe (1 bis 8). Ein Tipp = Automation läuft, ohne die App zu öffnen.</p>
+  <p>Homescreen lange drücken → Widgets → SmartFlow. Beim Platzieren bis zu 8 Automationen wählen. Das Widget ist in beide Richtungen größenveränderbar – je größer, desto mehr Knöpfe (1 bis 8). Ein Tipp = Automation läuft, ohne die App zu öffnen.</p>
+</section>
+
+<section>
+  <h2>Schnelleinstellungen &amp; Rückgängig</h2>
+  <p><b>Kachel:</b> In Einstellungen eine Automation für die Schnelleinstellungen wählen, dann die Leiste ganz herunterziehen → Stift → Kachel „SmartFlow“ hinzufügen. Ein Tipp startet sie.</p>
+  <p><b>Rückgängig:</b> Nach einer Automation mit Lampen erscheint auf dem Home-Tab für 15 Minuten „… rückgängig“. Ein Tipp stellt die Lampen so wieder her, wie sie vorher waren.</p>
+  <p><b>Starten/Stoppen:</b> Startest du eine laufende Automation (Wecklicht, Party) selbst noch einmal, wird sie gestoppt. Automatische Auslöser (Uhrzeit, GPS, WLAN, Lampen) stoppen nie eine laufende Automation.</p>
 </section>
 
 <section>
   <h2>Schütteln &amp; Standort</h2>
   <p><b>Schütteln:</b> in Einstellungen eine Automation wählen, die beim kräftigen Schütteln des Handys läuft (z. B. Panik-Aus).</p>
   <p><b>GPS-Trigger:</b> Zuhause-Adresse in Einstellungen eintragen (oder Koordinaten). Dann Automationen mit „Ankunft/Weggehen (GPS)“. Standort-Berechtigung auf <b>immer erlauben</b> stellen, sonst funktioniert es im Hintergrund nicht.</p>
+  <p><b>WLAN verlassen:</b> In Einstellungen den Namen deines Heim-WLANs eintragen („Aktuelles WLAN übernehmen“). Dann löst nur das Verlassen dieses Netzes aus, nicht jedes andere WLAN.</p>
 </section>
 
 <section>
   <h2>Zugriff für Gäste / iPhone</h2>
   <p>In Einstellungen „Web-Steuerung“ einschalten. Es startet ein kleiner Server; Gäste öffnen die angezeigte Adresse (oder scannen den QR-Code) im Browser und lösen Automationen per Knopf aus – ganz ohne App.</p>
+  <p>Die Adresse enthält einen geheimen Schlüssel (<code>?k=…</code>). Ohne ihn lehnt der Server jede Anfrage ab. Wer den Link nicht mehr haben soll: „Link erneuern“ – alle alten Links sind dann gesperrt.</p>
   <div class="warn">Die lokale Adresse funktioniert nur im selben WLAN und wenn dein Handy an ist.</div>
   <h3>Dauerhaft von überall (Tailscale)</h3>
   <ol>
     <li>Tailscale (kostenlos) auf beiden Handys installieren, mit demselben Konto anmelden.</li>
     <li>In der Tailscale-App die IP deines Handys ablesen (z. B. <code>100.x.y.z</code>).</li>
-    <li>Die Web-Steuerungs-Adresse mit dieser IP öffnen: <code>http://100.x.y.z:8782</code>.</li>
+    <li>Die Web-Steuerungs-Adresse mit dieser IP öffnen: <code>http://100.x.y.z:8782/?k=…</code> (Schlüssel aus der App übernehmen).</li>
     <li>Auf dem iPhone „Zum Home-Bildschirm hinzufügen“ – dann wie eine App.</li>
   </ol>
   <p class="sec">So funktioniert der Zugriff überall, solange dein Handy online ist.</p>
@@ -121,7 +130,7 @@
 
 <section>
   <h2>Unterwegs steuern (Tailscale)</h2>
-  <p>Sonos und LG haben keine brauchbare Cloud. Für Steuerung von unterwegs: Tailscale auf dem Handy und einem Heimgerät, Subnet-Routing aktivieren. Danach funktioniert HomeFlow unterwegs wie zuhause.</p>
+  <p>Sonos und LG haben keine brauchbare Cloud. Für Steuerung von unterwegs: Tailscale auf dem Handy und einem Heimgerät, Subnet-Routing aktivieren. Danach funktioniert SmartFlow unterwegs wie zuhause.</p>
 </section>
 
 <section>
@@ -131,7 +140,12 @@
 
 <section>
   <h2>Akku-Hinweis</h2>
-  <p>Für Hintergrund-Auslöser (Hue-Trigger, WLAN, GPS, Schütteln, Uhrzeit) läuft ein Dienst. Damit Samsung ihn nicht beendet: Einstellungen → Apps → HomeFlow → Akku → „Nicht optimiert“.</p>
+  <p>Für Hintergrund-Auslöser (Hue-Trigger, WLAN, GPS, Schütteln, Uhrzeit) läuft ein Dienst. Damit Samsung ihn nicht beendet: Einstellungen → Apps → SmartFlow → Akku → „Nicht optimiert“.</p>
+</section>
+
+<section>
+  <h2>Sicherung</h2>
+  <p>Einstellungen → Sicherung → Exportieren speichert alle Automationen und Geräte in eine Datei (z. B. in Google Drive). Importieren stellt sie wieder her, etwa auf einem neuen Handy. Die Datei enthält Geräte-Schlüssel: privat aufbewahren.</p>
 </section>
 
 <section>

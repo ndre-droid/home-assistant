@@ -189,7 +189,11 @@ data class Config(
     val spotifyClientId: String = "",            // user's own Spotify dev app
     val spotifyRefresh: String = "",             // OAuth refresh token ("" = not connected)
     val spotifyVerifier: String = "",            // transient PKCE verifier during login
-    val deviceRooms: Map<String, String> = emptyMap() // Sonos/TV IP -> Hue room id (Home tab grouping)
+    val spotifyState: String = "",               // transient OAuth state (CSRF check on callback)
+    val deviceRooms: Map<String, String> = emptyMap(), // Sonos/TV IP -> Hue room id (Home tab grouping)
+    val webToken: String = "",                   // secret in guest web-server URLs ("" = generate on start)
+    val homeWifiSsid: String = "",               // LEAVE_WIFI only fires when leaving this network ("" = any WiFi)
+    val tileRoutineId: String = ""               // Quick Settings tile routine ("" = none)
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
@@ -216,6 +220,8 @@ data class Config(
         put("spotifyClientId", spotifyClientId); put("spotifyRefresh", spotifyRefresh); put("spotifyVerifier", spotifyVerifier)
         put("themeMode", themeMode.name); put("dynamicColor", dynamicColor); put("accentColor", accentColor)
         put("deviceRooms", JSONObject().also { o -> deviceRooms.forEach { (k, v) -> o.put(k, v) } })
+        put("spotifyState", spotifyState); put("webToken", webToken)
+        put("homeWifiSsid", homeWifiSsid); put("tileRoutineId", tileRoutineId)
     }
 
     companion object {
@@ -272,6 +278,10 @@ data class Config(
                 spotifyClientId = o.optString("spotifyClientId", ""),
                 spotifyRefresh = o.optString("spotifyRefresh", ""),
                 spotifyVerifier = o.optString("spotifyVerifier", ""),
+                spotifyState = o.optString("spotifyState", ""),
+                webToken = o.optString("webToken", ""),
+                homeWifiSsid = o.optString("homeWifiSsid", ""),
+                tileRoutineId = o.optString("tileRoutineId", ""),
                 deviceRooms = o.optJSONObject("deviceRooms")?.let { m ->
                     m.keys().asSequence().associateWith { k -> m.optString(k) }
                 } ?: emptyMap()

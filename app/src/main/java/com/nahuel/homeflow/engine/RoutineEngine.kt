@@ -1,9 +1,6 @@
 package com.nahuel.homeflow.engine
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import com.nahuel.homeflow.data.*
 import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.LgTvClient
@@ -11,48 +8,81 @@ import com.nahuel.homeflow.devices.SonosClient
 import com.nahuel.homeflow.devices.SpotifyClient
 import com.nahuel.homeflow.devices.GenericClient
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Executes routines. All actions of a variant run IN PARALLEL so a routine with
- * lights + speaker + TV completes in the time of its slowest single command (~0.3 s),
- * not the sum. Errors never abort the rest; they are collected and shown once.
+ * Executes routines. Actions of the chosen branch run SEQUENTIALLY (each finishes before the
+ * next starts, so "off, then on" works). Errors never abort the rest; they are collected and
+ * reported once.
  */
 object RoutineEngine {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // One running instance per routine. Starting again while running = STOP (toggle).
+    // One running instance per routine.
     private val running = java.util.concurrent.ConcurrentHashMap<String, Job>()
 
-    private fun toast(ctx: Context, msg: String) {
-        Handler(Looper.getMainLooper()).post { Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show() }
-    }
+    /** Light states captured right before the last run, so it can be reverted with one tap. */
+    data class UndoPoint(val routineName: String, val at: Long, val actions: List<Action>)
 
-    fun runAsync(ctx: Context, routineId: String) {
+    private val _undo = MutableStateFlow<UndoPoint?>(null)
+    val undo: StateFlow<UndoPoint?> = _undo
+    const val UNDO_WINDOW_MS = 15 * 60_000L
+
+    fun runAsync(ctx: Context, routineId: String, toggle: Boolean = true) {
         val r = Store.routine(routineId) ?: return
-        runAsync(ctx, r)
+        runAsync(ctx, r, toggle)
     }
 
-    fun runAsync(ctx: Context, routine: Routine) {
+    /**
+     * @param toggle true for user-started runs (tap, widget, NFC, tile, shake, web):
+     *   starting a routine that is still running (wake-up fade, party, ...) STOPS it.
+     *   Automatic triggers pass false, so a repeated event never cancels a running routine.
+     */
+    fun runAsync(ctx: Context, routine: Routine, toggle: Boolean = true) {
         val appCtx = ctx.applicationContext
-        // Already running (wake-up fade, party, ...)? Second start stops it instead of stacking.
         running[routine.id]?.let { job ->
             if (job.isActive) {
+                if (!toggle) return
                 job.cancel()
                 running.remove(routine.id)
                 Store.logRun(routine.name, true, "gestoppt")
-                toast(appCtx, "⏹ ${routine.name} gestoppt")
+                Notifier.result(appCtx, "⏹ ${routine.name} gestoppt", isError = false)
                 return
             }
         }
         val job = scope.launch {
             val errors = run(routine)
             Store.logRun(routine.name, errors.isEmpty(), errors.firstOrNull() ?: "")
-            val msg = if (errors.isEmpty()) "▶ ${routine.name}"
-            else "${routine.name}: ${errors.size} Fehler, ${errors.first()}"
-            toast(appCtx, msg)
+            if (errors.isEmpty()) Notifier.result(appCtx, "▶ ${routine.name}", isError = false)
+            else Notifier.result(appCtx, "${routine.name}: ${errors.size} Fehler, ${errors.first()}", isError = true)
         }
         running[routine.id] = job
         job.invokeOnCompletion { running.remove(routine.id) }
+    }
+
+    /** Restores the lights to how they were before the last routine. */
+    fun undoLast(ctx: Context) {
+        val point = _undo.value ?: return
+        _undo.value = null
+        val appCtx = ctx.applicationContext
+        scope.launch {
+            val errors = point.actions.mapNotNull { a -> execute(a).exceptionOrNull()?.message }
+            Store.logRun("Rückgängig: ${point.routineName}", errors.isEmpty(), errors.firstOrNull() ?: "")
+            Notifier.result(appCtx, if (errors.isEmpty()) "↩ ${point.routineName} rückgängig" else "Rückgängig: ${errors.first()}", errors.isNotEmpty())
+        }
+    }
+
+    fun undoAvailable(now: Long = System.currentTimeMillis()): UndoPoint? =
+        _undo.value?.takeIf { now - it.at < UNDO_WINDOW_MS }
+
+    private suspend fun snapshot(routine: Routine, variant: Variant) {
+        val hueIds = variant.actions.filter { it.target == TargetType.HUE }.map { it.deviceId }.toSet()
+        if (hueIds.isEmpty()) return
+        val lights = HueClient.lights().getOrNull() ?: return
+        val affected = if ("all" in hueIds) lights else lights.filter { it.id in hueIds }
+        val actions = SceneCapture.lightStateActions(affected)
+        if (actions.isNotEmpty()) _undo.value = UndoPoint(routine.name, System.currentTimeMillis(), actions)
     }
 
     /** Decision tree: branches are checked top-down, first branch whose conditions ALL match wins. */
@@ -72,6 +102,7 @@ object RoutineEngine {
 
     suspend fun run(routine: Routine): List<String> {
         val variant = pickVariant(routine) ?: return listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
+        runCatching { snapshot(routine, variant) }
         val errors = mutableListOf<String>()
         // Sequential: each action finishes before the next, so off-then-on works.
         for (action in variant.actions) {

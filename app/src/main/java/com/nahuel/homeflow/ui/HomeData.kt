@@ -163,6 +163,14 @@ object HomeRepo {
         SonosClient.setVolume(ip, volume).onFailure { _error.value = "Sonos: ${it.message}" }
     }
 
+    /** Live on/off from the Hue event stream (TriggerService) - instant UI without waiting for a poll. */
+    fun applyLightEvent(id: String, on: Boolean) {
+        val cur = _lights.value
+        if (cur.none { it.id == id && it.on != on }) return
+        _lights.value = cur.map { if (it.id == id) it.copy(on = on) else it }
+        rebuild()
+    }
+
     fun setTvOn(ip: String, on: Boolean) { _tvOn.value = _tvOn.value + (ip to on) }
 
     /** Everything off: lights, speakers paused, TVs off. */
@@ -170,8 +178,11 @@ object HomeRepo {
         val cfg = Store.config.value
         val jobs = mutableListOf<Deferred<Any?>>()
         jobs += async {
-            if (_lights.value.isEmpty()) HueClient.setLight("all", on = false, brightness = null, colorHex = null)
-            else setLights(_lights.value.map { it.id }, on = false)
+            // One group command for the whole home instead of one per light.
+            _lights.value = _lights.value.map { it.copy(on = false) }
+            rebuild()
+            HueClient.setLight("all", on = false, brightness = null, colorHex = null)
+                .onFailure { _error.value = "Hue: ${it.message}" }
         }
         cfg.sonos.forEach { s -> jobs += async { SonosClient.pause(s.ip) } }
         cfg.tvs.filter { it.clientKey.isNotEmpty() }.forEach { t ->

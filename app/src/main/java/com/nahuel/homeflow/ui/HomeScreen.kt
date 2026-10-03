@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -143,6 +144,7 @@ fun HomeScreen(
                 scope.launch { HomeRepo.allOff() }
             }
         }
+        UndoBar()
 
         // ---- Rooms ----
         if (rooms.isNotEmpty() || (!loaded && !nothingSetUp)) {
@@ -333,5 +335,32 @@ private fun RoomCard(
                 }
             }
         }
+    }
+}
+
+/** "Undo <routine>" chip: restores the lights to how they were before the last run (15 min window). */
+@Composable
+private fun UndoBar() {
+    val ctx = LocalContext.current
+    val point by RoutineEngine.undo.collectAsState()
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(point) { while (point != null) { now = System.currentTimeMillis(); delay(30_000) } }
+    val p = point?.takeIf { now - it.at < RoutineEngine.UNDO_WINDOW_MS } ?: return
+    Spacer(Modifier.height(10.dp))
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(Fill)
+            .clickable(role = Role.Button, onClickLabel = "Rückgängig") { RoutineEngine.undoLast(ctx) }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = null, tint = AccentText, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "„${p.routineName}“ rückgängig",
+            color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
     }
 }

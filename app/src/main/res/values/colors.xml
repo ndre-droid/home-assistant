@@ -1,13 +1,14 @@
 <resources>
-    <!-- Modernist: ground #f3f2f2, ink #201e1d, one accent #ec3013. -->
-    <color name="accent">#EC3013</color>
+    <!-- Calm dark: near-black ground, warm amber accent (the colour of light).
+         Light variant uses the deeper amber so it reads on white. -->
+    <color name="accent">#A35F0C</color>
 
     <!-- Launcher icon background. Deliberately ink, not ground: a near-white
          adaptive icon disappears on light launcher wallpapers. -->
-    <color name="ic_bg">#201E1D</color>
+    <color name="ic_bg">#0C0D0E</color>
 
     <!-- Window and widget surfaces follow the light/dark scheme (see values-night). -->
-    <color name="window_bg">#F3F2F2</color>
-    <color name="widget_bg">#F3F2F2</color>
-    <color name="widget_text">#201E1D</color>
+    <color name="window_bg">#F4F3F0</color>
+    <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_text">#1A1B1C</color>
 </resources>

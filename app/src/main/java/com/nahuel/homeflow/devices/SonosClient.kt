@@ -136,7 +136,7 @@ object SonosClient {
 
         val plainPath = real.substringBefore('?').lowercase()
         val isFile = AUDIO_FILE_EXT.any { plainPath.endsWith(it) }
-        val title = real.substringAfterLast('/').substringBefore('?').ifBlank { "HomeFlow" }
+        val title = real.substringAfterLast('/').substringBefore('?').ifBlank { "SmartFlow" }
 
         val isHttps = real.startsWith("https://", ignoreCase = true)
         val playUriStr: String

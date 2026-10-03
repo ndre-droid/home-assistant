@@ -10,7 +10,7 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmScheduler.ACTION_FIRE) return
         Store.init(context.applicationContext)
-        intent.getStringExtra("routineId")?.let { RoutineEngine.runAsync(context, it) }
+        intent.getStringExtra("routineId")?.let { RoutineEngine.runAsync(context, it, toggle = false) }
         // Re-arm for the next occurrence (alarms are one-shot).
         AlarmScheduler.rescheduleAll(context.applicationContext)
     }

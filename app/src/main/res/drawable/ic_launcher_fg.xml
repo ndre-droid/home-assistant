@@ -1,19 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SmartFlow mark: an S-shaped ribbon of light flowing out of a glowing dot.
+     Amber on near-black matches the app's calm dark theme. All art sits inside the
+     66dp adaptive-icon safe zone (centre 54,54, radius 33). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Modern flat lightning bolt (HomeFlow mark), Modernist accent red, centered in safe zone -->
+    <!-- Soft glow behind the light source -->
+    <path android:fillColor="#F0B45E" android:fillAlpha="0.16"
+        android:pathData="M69,36m-15,0a15,15 0,1 1,30 0a15,15 0,1 1,-30 0" />
+    <!-- The flow -->
     <path
-        android:fillColor="#EC3013"
-        android:pathData="M61.5,22
-            L42,57.5
-            a2,2 0 0 0 1.8,3
-            L54,60.5
-            L48.5,84.5
-            a1.4,1.4 0 0 0 2.5,1.1
-            L67,50.2
-            a2,2 0 0 0 -1.8,-3
-            L55.5,47.2
-            L64.2,24.2
-            a1.4,1.4 0 0 0 -2.7,-2.2
-            Z" />
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M69,36 C69,26.5 38,26 38,41 C38,55 70,53 70,67 C70,82 41,83 38,74">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear"
+                android:startX="69" android:startY="30"
+                android:endX="40" android:endY="80"
+                android:startColor="#FFD48A"
+                android:endColor="#E58A33" />
+        </aapt:attr>
+    </path>
+    <!-- The light -->
+    <path android:fillColor="#FFF1D6"
+        android:pathData="M69,36m-7.5,0a7.5,7.5 0,1 1,15 0a7.5,7.5 0,1 1,-15 0" />
 </vector>

@@ -2,6 +2,9 @@ package com.nahuel.homeflow.devices
 
 import com.nahuel.homeflow.data.Store
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -100,12 +103,57 @@ object HueClient {
         }
     }
 
+    // The bridge drops commands beyond ~10/s for lights (1/s for groups). All light PUTs go
+    // through one gate so party/strobe/fan-out never flood it.
+    private const val MIN_GAP_MS = 100L
+    private val sendGate = Mutex()
+    @Volatile private var lastSend = 0L
+
+    private suspend fun <T> throttled(block: () -> T): T = sendGate.withLock {
+        val wait = lastSend + MIN_GAP_MS - System.currentTimeMillis()
+        if (wait > 0) delay(wait)
+        try { block() } finally { lastSend = System.currentTimeMillis() }
+    }
+
+    /** grouped_light owned by bridge_home = "every light" in ONE command. Cached per bridge. */
+    @Volatile private var allGroup: Pair<String, String>? = null   // bridge ip -> grouped_light id
+
+    private fun allLightsGroupId(): String? {
+        allGroup?.takeIf { it.first == ip() }?.let { return it.second }
+        return runCatching {
+            Http.local.newCall(v2("resource/grouped_light").get().build()).execute().use { resp ->
+                check(resp.isSuccessful)
+                val data = JSONObject(resp.body!!.string()).getJSONArray("data")
+                (0 until data.length()).map { data.getJSONObject(it) }
+                    .firstOrNull { it.optJSONObject("owner")?.optString("rtype") == "bridge_home" }
+                    ?.getString("id")
+            }
+        }.getOrNull()?.also { allGroup = ip() to it }
+    }
+
     /** Any of the params may be null = leave unchanged. deviceId "all" fans out to every light. */
     suspend fun setLight(id: String, on: Boolean?, brightness: Int?, colorHex: String?, exclude: List<String> = emptyList()): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val targets = (if (id == "all") lights().getOrThrow().map { it.id } else listOf(id))
                     .filter { it !in exclude }
+                // Plain on/off/dim of every light: one group command instead of N light commands.
+                if (id == "all" && exclude.isEmpty() && colorHex == null && (on != null || brightness != null)) {
+                    val group = allLightsGroupId()
+                    if (group != null) {
+                        val gBody = JSONObject().apply {
+                            on?.let { put("on", JSONObject().put("on", it)) }
+                            brightness?.let { put("dimming", JSONObject().put("brightness", it.coerceIn(1, 100).toDouble())) }
+                        }.toString().toRequestBody(json)
+                        targets.forEach { HueEcho.mark(it) }
+                        throttled {
+                            Http.local.newCall(v2("resource/grouped_light/$group").put(gBody).build()).execute().use { resp ->
+                                check(resp.isSuccessful) { "Hue HTTP ${resp.code}" }
+                            }
+                        }
+                        return@runCatching
+                    }
+                }
                 val body = JSONObject().apply {
                     on?.let { put("on", JSONObject().put("on", it)) }
                     brightness?.let {
@@ -118,15 +166,21 @@ object HueClient {
                 }.toString().toRequestBody(json)
                 targets.forEach { t ->
                     HueEcho.mark(t)
-                    Http.local.newCall(v2("resource/light/$t").put(body).build()).execute().use { resp ->
-                        check(resp.isSuccessful) { "Hue HTTP ${resp.code}" }
+                    throttled {
+                        Http.local.newCall(v2("resource/light/$t").put(body).build()).execute().use { resp ->
+                            check(resp.isSuccessful) { "Hue HTTP ${resp.code}" }
+                        }
                     }
                 }
             }
         }
 
-    /** Server-sent events; onLightEvent fires on every on/off change. Blocking until cancelled. */
-    fun openEventStream(onLightEvent: (lightId: String, on: Boolean) -> Unit, onFailure: () -> Unit): EventSource {
+    /** Server-sent events; onLightEvent fires on every on/off change. onFailure also fires on a clean close. */
+    fun openEventStream(
+        onLightEvent: (lightId: String, on: Boolean) -> Unit,
+        onFailure: () -> Unit,
+        onOpen: () -> Unit = {}
+    ): EventSource {
         val req = v2("").url("https://${ip()}/eventstream/clip/v2")
             .header("Accept", "text/event-stream").build()
         return EventSources.createFactory(Http.localStream).newEventSource(req, object : EventSourceListener() {
@@ -145,6 +199,14 @@ object HueClient {
                         }
                     }
                 }
+            }
+
+            override fun onOpen(eventSource: EventSource, response: Response) {
+                onOpen()
+            }
+
+            override fun onClosed(eventSource: EventSource) {
+                onFailure()   // bridge closed the stream (e.g. reboot) - reconnect like on errors
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {

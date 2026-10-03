@@ -41,7 +41,7 @@ object RadioBrowser {
                     "?limit=25&hidebroken=true&order=votes&reverse=true&name=" +
                     URLEncoder.encode(query.trim(), "UTF-8")
             val req = Request.Builder().url(url)
-                .header("User-Agent", "HomeFlow/1.0").get().build()
+                .header("User-Agent", "SmartFlow/1.0").get().build()
             Http.internet.newCall(req).execute().use { resp ->
                 check(resp.isSuccessful) { "Suche fehlgeschlagen (HTTP ${resp.code})" }
                 val arr = JSONArray(resp.body!!.string())

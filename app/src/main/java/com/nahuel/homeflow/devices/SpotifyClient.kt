@@ -35,9 +35,10 @@ object SpotifyClient {
         return Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
 
-    fun authUrl(clientId: String, verifier: String): String =
+    fun authUrl(clientId: String, verifier: String, state: String): String =
         "https://accounts.spotify.com/authorize?response_type=code" +
-            "&client_id=" + clientId +
+            "&client_id=" + java.net.URLEncoder.encode(clientId, "UTF-8") +
+            "&state=" + state +
             "&redirect_uri=" + java.net.URLEncoder.encode(REDIRECT, "UTF-8") +
             "&scope=" + java.net.URLEncoder.encode(
                 "user-modify-playback-state user-read-playback-state", "UTF-8") +

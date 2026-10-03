@@ -2,6 +2,7 @@ package com.nahuel.homeflow.engine
 
 import com.nahuel.homeflow.data.*
 import com.nahuel.homeflow.devices.HueClient
+import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.devices.SonosClient
 
 /**
@@ -12,6 +13,16 @@ import com.nahuel.homeflow.devices.SonosClient
  */
 object SceneCapture {
 
+    /** One "set" action per light that reproduces its current on/brightness/color. */
+    fun lightStateActions(lights: List<HueLight>): List<Action> = lights.map { l ->
+        val p = mutableMapOf("on" to l.on.toString())
+        if (l.on) {
+            p["brightness"] = l.brightness.toString()
+            if (l.supportsColor && l.colorHex != null) p["color"] = l.colorHex
+        }
+        Action(TargetType.HUE, l.id, "set", p)
+    }
+
     suspend fun capture(
         name: String,
         lightIds: Set<String>,
@@ -21,15 +32,7 @@ object SceneCapture {
         val actions = mutableListOf<Action>()
 
         if (lightIds.isNotEmpty()) {
-            val lights = HueClient.lights().getOrThrow().filter { it.id in lightIds }
-            lights.forEach { l ->
-                val p = mutableMapOf("on" to l.on.toString())
-                if (l.on) {
-                    p["brightness"] = l.brightness.toString()
-                    if (l.supportsColor && l.colorHex != null) p["color"] = l.colorHex
-                }
-                actions += Action(TargetType.HUE, l.id, "set", p)
-            }
+            actions += lightStateActions(HueClient.lights().getOrThrow().filter { it.id in lightIds })
         }
 
         speakerIps.forEach { ip ->

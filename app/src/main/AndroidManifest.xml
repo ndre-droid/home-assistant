@@ -22,8 +22,9 @@
     <application
         android:name=".HomeFlowApp"
         android:enableOnBackInvokedCallback="true"
-        android:label="HomeFlow"
+        android:label="SmartFlow"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.HomeFlow"
         android:usesCleartextTraffic="true">
 
@@ -71,6 +72,18 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Quick Settings tile: one tap = run the routine chosen in Settings -->
+        <service
+            android:name=".engine.RoutineTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_smartflow"
+            android:label="SmartFlow"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <!-- Home screen widget: one tap = run routine -->
         <receiver android:name=".widget.RoutineWidget" android:exported="true">

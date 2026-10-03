@@ -19,8 +19,8 @@ object GenericClient {
             } else {
                 builder.get()
             }
-            // Generic devices may be local (self-signed) or internet; use the lenient local client.
-            Http.local.newCall(builder.build()).execute().use { resp ->
+            // LAN devices (Shelly, Tasmota, HA) may be self-signed; internet webhooks get full TLS checks.
+            Http.forUrl(url).newCall(builder.build()).execute().use { resp ->
                 check(resp.isSuccessful) { "HTTP ${resp.code}" }
             }
         }

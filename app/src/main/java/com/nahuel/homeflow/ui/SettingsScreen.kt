@@ -3,6 +3,9 @@ package com.nahuel.homeflow.ui
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +44,25 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var editBias by remember { mutableStateOf(false) }
     var showAccentWheel by remember { mutableStateOf(false) }
     var showWidgetHelp by remember { mutableStateOf(false) }
+    var pendingImport by remember { mutableStateOf<String?>(null) }
+
+    // Backup: Storage Access Framework, so the file can go to Drive, Downloads, a USB stick...
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val ok = runCatching {
+            ctx.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(Store.exportJson().toByteArray()) }
+        }.isSuccess
+        Toast.makeText(ctx, if (ok) "Sicherung gespeichert" else "Sicherung fehlgeschlagen", Toast.LENGTH_SHORT).show()
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        pendingImport = runCatching {
+            ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+        }.getOrNull()
+        if (pendingImport == null) Toast.makeText(ctx, "Datei nicht lesbar", Toast.LENGTH_SHORT).show()
+    }
 
     LaunchedEffect(config.hueAppKey) {
         if (config.hueAppKey.isNotEmpty())
@@ -227,7 +249,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    HintText("iPhone-Kamera auf den QR-Code halten, in Safari öffnen, zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button.")
+                    HintText("iPhone-Kamera auf den QR-Code halten, in Safari öffnen, zum Home-Bildschirm hinzufügen. Jede aktive Automation wird zum Button. Der Link enthält einen geheimen Schlüssel: nur wer ihn hat, kann etwas auslösen.")
+                    Spacer(Modifier.height(4.dp))
+                    GhostButton("Link erneuern (alte Links sperren)") {
+                        com.nahuel.homeflow.engine.WebTriggerServer.rotateToken()
+                    }
                     Spacer(Modifier.height(10.dp))
                     Text("Nur im Heim-WLAN?", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
@@ -291,6 +317,47 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 HintText("Läuft der TV, färben sich die gewählten Lampen nach Inhalt (Netflix/HDMI → warm-orange, YouTube → violett, Live-TV → blau). TV aus → Lampen aus. Stimmung nach Content-Typ, ~5 s Reaktion — frame-genaues Ambilight ist ohne HDMI-Capture-Hardware technisch nicht möglich.")
             }
 
+            // ---- Heim-WLAN ----
+            Section("Heim-WLAN (Auslöser „WLAN verlassen“)") {
+                FlatField("WLAN-Name (SSID)", config.homeWifiSsid, placeholder = "leer = jedes WLAN") { v ->
+                    Store.updateConfig { it.copy(homeWifiSsid = v.trim()) }
+                }
+                Spacer(Modifier.height(8.dp))
+                SecondaryButton("Aktuelles WLAN übernehmen", Modifier.fillMaxWidth()) {
+                    val ssid = currentSsid(ctx)
+                    if (ssid != null) Store.updateConfig { it.copy(homeWifiSsid = ssid) }
+                    else Toast.makeText(ctx, "WLAN-Name nicht lesbar (WLAN an? Standort-Berechtigung?)", Toast.LENGTH_LONG).show()
+                }
+                Spacer(Modifier.height(8.dp))
+                HintText("Ist ein Name gesetzt, löst nur das Verlassen dieses Netzes aus, nicht etwa das Hotel- oder Büro-WLAN. Android gibt den Namen nur mit Standort-Berechtigung heraus.")
+            }
+
+            // ---- Schnelleinstellungen ----
+            Section("Schnelleinstellungen-Kachel") {
+                val routines by Store.routines.collectAsState()
+                RoutinePicker(routines, config.tileRoutineId, noneLabel = "Keine") { id ->
+                    Store.updateConfig { it.copy(tileRoutineId = id) }
+                    com.nahuel.homeflow.engine.RoutineTileService.refresh(ctx)
+                }
+                Spacer(Modifier.height(8.dp))
+                HintText("Benachrichtigungsleiste ganz herunterziehen → Stift-Symbol → Kachel „SmartFlow“ hinzufügen. Ein Tipp startet diese Automation.")
+            }
+
+            // ---- Sicherung ----
+            Section("Sicherung") {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Exportieren", Modifier.weight(1f)) {
+                        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                        exportLauncher.launch("smartflow-$day.json")
+                    }
+                    SecondaryButton("Importieren", Modifier.weight(1f)) {
+                        importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                HintText("Sichert alle Automationen und Geräte in eine Datei. Enthält Geräte-Schlüssel (Hue, TV, Spotify): Datei privat aufbewahren.")
+            }
+
             // ---- Anwesenheit ----
             Section("Anwesenheit (Partnerin)") {
                 FlatField("iPhone-IP im WLAN", config.partnerIp) { v ->
@@ -319,8 +386,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 } else {
                     PrimaryButton("Mit Spotify verbinden", enabled = config.spotifyClientId.isNotBlank()) {
                         val verifier = com.nahuel.homeflow.devices.SpotifyClient.newVerifier()
-                        Store.updateConfig { it.copy(spotifyVerifier = verifier) }
-                        val url = com.nahuel.homeflow.devices.SpotifyClient.authUrl(config.spotifyClientId, verifier)
+                        val state = com.nahuel.homeflow.devices.SpotifyClient.newVerifier().take(24)
+                        Store.updateConfig { it.copy(spotifyVerifier = verifier, spotifyState = state) }
+                        val url = com.nahuel.homeflow.devices.SpotifyClient.authUrl(config.spotifyClientId, verifier, state)
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                     }
                 }
@@ -340,12 +408,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     "1. Tailscale-App auf diesem Handy installieren und anmelden.\n" +
                         "2. Tailscale auf einem Gerät zuhause installieren, das durchläuft, und Subnet-Router aktivieren (z. B. 192.168.178.0/24).\n" +
                         "3. Route im Tailscale-Admin freigeben.\n" +
-                        "Danach funktioniert HomeFlow unterwegs exakt wie im WLAN."
+                        "Danach funktioniert SmartFlow unterwegs exakt wie im WLAN."
                 )
             }
 
             Section("Akku-Hinweis") {
-                HintText("Für Geräte-Trigger und Bias-Light läuft ein Hintergrunddienst. Damit Samsung ihn nicht beendet: Einstellungen → Apps → HomeFlow → Akku → „Nicht optimiert\".")
+                HintText("Für Geräte-Trigger und Bias-Light läuft ein Hintergrunddienst. Damit Samsung ihn nicht beendet: Einstellungen → Apps → SmartFlow → Akku → „Nicht optimiert\".")
             }
 
             Spacer(Modifier.height(24.dp))
@@ -360,6 +428,26 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
     }
 
+    pendingImport?.let { text ->
+        FlatDialog(
+            onDismissRequest = { pendingImport = null },
+            title = "Sicherung importieren?",
+            confirmButton = {
+                GhostButton("Ersetzen", color = MaterialTheme.colorScheme.error) {
+                    pendingImport = null
+                    Store.importJson(text)
+                        .onSuccess { n ->
+                            TriggerService.sync(ctx)
+                            Toast.makeText(ctx, "$n Automationen wiederhergestellt", Toast.LENGTH_SHORT).show()
+                        }
+                        .onFailure { Toast.makeText(ctx, "Import fehlgeschlagen: ${it.message}", Toast.LENGTH_LONG).show() }
+                }
+            },
+            dismissButton = { GhostButton("Abbrechen", color = Muted) { pendingImport = null } },
+            text = { Caption("Alle aktuellen Automationen und Geräte-Einstellungen werden durch die Sicherung ersetzt.") }
+        )
+    }
+
     if (showWidgetHelp) {
         FlatDialog(
             onDismissRequest = { showWidgetHelp = false },
@@ -367,7 +455,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             confirmButton = { GhostButton("Verstanden") { showWidgetHelp = false } },
             text = {
                 Caption(
-                    "Homescreen lange drücken → Widgets → HomeFlow. Beim Ablegen öffnet sich die Auswahl, " +
+                    "Homescreen lange drücken → Widgets → SmartFlow. Beim Ablegen öffnet sich die Auswahl, " +
                         "in der du bis zu 8 Automationen in Tipp-Reihenfolge wählst."
                 )
             }
@@ -395,3 +483,34 @@ private fun ToggleRow(
         FlatToggle(checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }
+
+/** Dropdown to pick one routine (or none). */
+@Composable
+private fun RoutinePicker(
+    routines: List<com.nahuel.homeflow.data.Routine>,
+    selectedId: String,
+    noneLabel: String,
+    onPick: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    val name = routines.firstOrNull { it.id == selectedId }?.name ?: noneLabel
+    Box {
+        SecondaryButton(name, Modifier.fillMaxWidth()) { open = true }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier.background(Bg).border(RuleWidth, Divider)
+        ) {
+            DropdownMenuItem(text = { Text(noneLabel, color = Ink, fontSize = 13.sp) }, onClick = { onPick(""); open = false })
+            routines.forEach { r ->
+                DropdownMenuItem(text = { Text(r.name, color = Ink, fontSize = 13.sp) }, onClick = { onPick(r.id); open = false })
+            }
+        }
+    }
+}
+
+/** SSID of the current WiFi, or null when Android redacts it (no location permission / WiFi off). */
+@Suppress("DEPRECATION")
+private fun currentSsid(ctx: android.content.Context): String? = runCatching {
+    ctx.applicationContext.getSystemService(android.net.wifi.WifiManager::class.java).connectionInfo.ssid
+}.getOrNull()?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }

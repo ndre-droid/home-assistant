@@ -1,0 +1,23 @@
+# Build output
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+*.class
+
+# Stray compiler output at repo root
+/com/
+/org/
+/META-INF/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Local config + signing secrets (never commit)
+local.properties
+*.keystore
+*.jks
+app/homeflow.keystore.b64

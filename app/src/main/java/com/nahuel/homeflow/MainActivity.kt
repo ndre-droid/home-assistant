@@ -51,10 +51,20 @@ class MainActivity : ComponentActivity() {
     // When non-null, the next scanned NFC tag is written with this routine's launch URI.
     private var nfcWriteRoutineId = mutableStateOf<String?>(null)
 
+    // A homeflow://run link from a browser or another app: run only after the user confirms.
+    private var linkRunId = mutableStateOf<String?>(null)
+
+    private val notifPermission =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         TriggerService.sync(this)
+        // Android 13+: needed for the background-error notification and the service notice.
+        if (android.os.Build.VERSION.SDK_INT >= 33 && savedInstanceState == null &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
         enableEdgeToEdge()
         setContent {
@@ -65,6 +75,19 @@ class MainActivity : ComponentActivity() {
                     onRequestNfcWrite = { nfcWriteRoutineId.value = it },
                     onCancelNfcWrite = { nfcWriteRoutineId.value = null }
                 )
+                linkRunId.value?.let { id ->
+                    val r = Store.routine(id)
+                    if (r == null) linkRunId.value = null
+                    else FlatDialog(
+                        onDismissRequest = { linkRunId.value = null },
+                        title = "Automation starten?",
+                        confirmButton = {
+                            GhostButton("Starten") { linkRunId.value = null; RoutineEngine.runAsync(this, r) }
+                        },
+                        dismissButton = { GhostButton("Abbrechen", color = Muted) { linkRunId.value = null } },
+                        text = { Caption("Ein Link möchte „${r.name}“ ausführen.") }
+                    )
+                }
             }
         }
     }
@@ -83,9 +106,17 @@ class MainActivity : ComponentActivity() {
             writeTag(tag, writeId)
             return
         }
+        if (intent != null && intent.data == null && tag != null && runFromTag(intent)) return
         val data = intent?.data ?: return
         if (data.scheme == "homeflow" && data.host == "spotify") {
             val code = data.getQueryParameter("code")
+            val expected = Store.config.value.spotifyState
+            if (code != null && (expected.isEmpty() || data.getQueryParameter("state") != expected)) {
+                // Callback we didn't start (or a replay) - never exchange a foreign code.
+                Toast.makeText(this, "Spotify-Login ungültig, bitte neu verbinden", Toast.LENGTH_LONG).show()
+                return
+            }
+            Store.updateConfig { it.copy(spotifyState = "") }
             if (code != null) {
                 CoroutineScope(Dispatchers.IO).launch {
                     val ok = SpotifyClient.exchangeCode(code)
@@ -104,10 +135,23 @@ class MainActivity : ComponentActivity() {
             return
         }
         if (data.scheme == "homeflow" && data.host == "run") {
-            data.lastPathSegment?.let { id ->
-                RoutineEngine.runAsync(this, id)
-            }
+            val id = data.lastPathSegment ?: return
+            // NFC tags are physical and were written by this app: run directly.
+            // Anything else (VIEW from a web page / other app) needs a confirmation tap.
+            if (intent.action == NfcAdapter.ACTION_NDEF_DISCOVERED) RoutineEngine.runAsync(this, id)
+            else linkRunId.value = id
         }
+    }
+
+    /** With foreground dispatch, tags arrive as TAG_DISCOVERED without intent.data: read the NDEF URI ourselves. */
+    private fun runFromTag(intent: Intent): Boolean {
+        @Suppress("DEPRECATION")
+        val msgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES) ?: return false
+        val uri = msgs.filterIsInstance<NdefMessage>().flatMap { it.records.toList() }
+            .firstNotNullOfOrNull { rec -> runCatching { rec.toUri() }.getOrNull() }
+            ?.takeIf { it.scheme == "homeflow" && it.host == "run" } ?: return false
+        uri.lastPathSegment?.let { RoutineEngine.runAsync(this, it) }
+        return true
     }
 
     override fun onResume() {
@@ -175,7 +219,8 @@ private fun AppRoot(
             HomeRepo.refresh(includeTv = true)
             var n = 0
             while (isActive) {
-                delay(6_000)
+                // Hue changes arrive live via the event stream when it's connected; poll less then.
+                delay(if (TriggerService.streamConnected) 15_000 else 6_000)
                 n++
                 HomeRepo.refresh(includeTv = n % 5 == 0)
             }

@@ -303,7 +303,7 @@ fun HistoryDialog(onDismiss: () -> Unit) {
         text = {
             if (history.isEmpty()) Caption("Noch nichts ausgeführt.")
             else LazyColumn(Modifier.height(340.dp)) {
-                items(history, key = { it.timestamp }) { h ->
+                items(history) { h ->   // no key: two runs in the same ms would collide and crash
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
