@@ -62,6 +62,44 @@ object HueClient {
         }
     }
 
+    // ---------- Discovery (finding the bridge again after an IP change) ----------
+
+    /** A bridge on the LAN. [id] is the lower-case bridge id, e.g. "001788fffe123456". */
+    data class Bridge(val id: String, val ip: String)
+
+    /** SSDP first (local only); Philips' cloud lookup as fallback when multicast is blocked. */
+    suspend fun discoverBridges(): List<Bridge> = withContext(Dispatchers.IO) {
+        val local = Ssdp.search("upnp:rootdevice").mapNotNull { hit ->
+            hit.headers["hue-bridgeid"]?.takeIf { it.isNotBlank() }?.let { Bridge(it.lowercase(), hit.ip) }
+        }
+        local.ifEmpty {
+            runCatching {
+                val req = Request.Builder().url("https://discovery.meethue.com/").get().build()
+                Http.internet.newCall(req).execute().use { resp ->
+                    val arr = JSONArray(resp.body!!.string())
+                    (0 until arr.length()).map { arr.getJSONObject(it) }
+                        .map { Bridge(it.optString("id").lowercase(), it.optString("internalipaddress")) }
+                        // never point the app at a public host just because the cloud said so
+                        .filter { it.id.isNotEmpty() && Http.isPrivateHost(it.ip) }
+                }
+            }.getOrDefault(emptyList())
+        }.distinctBy { it.id }
+    }
+
+    /** Bridge id at [ip] if our app key is accepted there, else null. Proves "same bridge, still paired". */
+    suspend fun verifiedBridgeId(ip: String, key: String): String? = withContext(Dispatchers.IO) {
+        if (ip.isBlank() || key.isBlank()) return@withContext null
+        runCatching {
+            val req = Request.Builder().url("https://$ip/clip/v2/resource/bridge")
+                .header("hue-application-key", key).get().build()
+            Http.local.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                JSONObject(resp.body!!.string()).getJSONArray("data").getJSONObject(0)
+                    .optString("bridge_id").lowercase().ifEmpty { null }
+            }
+        }.getOrNull()
+    }
+
     suspend fun lights(): Result<List<HueLight>> = withContext(Dispatchers.IO) {
         runCatching {
             Http.local.newCall(v2("resource/light").get().build()).execute().use { resp ->

@@ -162,6 +162,26 @@ object LgTvClient {
         payload?.optString("appId").orEmpty().ifEmpty { error("Keine App-Info") }
     }
 
+    /** A webOS TV that answered SSDP. Only TVs that are on (or in network standby) answer. */
+    data class Found(val id: String, val ip: String, val name: String)
+
+    suspend fun discover(): List<Found> = withContext(Dispatchers.IO) {
+        Ssdp.search("urn:lge-com:service:webos-second-screen:1")
+            .distinctBy { it.ip }
+            .mapNotNull { hit ->
+                val id = Ssdp.uuidOf(hit.headers["usn"]).ifEmpty { return@mapNotNull null }
+                val name = hit.headers["location"]?.takeIf { Http.isPrivateHost(runCatching { java.net.URI(it).host }.getOrNull().orEmpty()) }
+                    ?.let { loc ->
+                        runCatching {
+                            Http.local.newCall(Request.Builder().url(loc).get().build()).execute().use { resp ->
+                                Regex("<friendlyName>([^<]*)</friendlyName>").find(resp.body?.string().orEmpty())?.groupValues?.get(1)
+                            }
+                        }.getOrNull()
+                    }
+                Found(id, hit.ip, name ?: "LG TV ${hit.ip}")
+            }
+    }
+
     /** Wake-on-LAN magic packet. Requires MAC address + TV network standby enabled. */
     suspend fun powerOn(mac: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {

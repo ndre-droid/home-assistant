@@ -252,6 +252,8 @@ class TriggerService : Service() {
                 onOpen = { streamConnected = true; backoff = 5_000L }
             )
             reconnect.await()          // stream died -> retry with exponential backoff (5 s .. 2 min)
+            // Repeated failures: the bridge may have a new IP (router change) - try to re-find it.
+            if (backoff >= 20_000L) DeviceRelocator.heal()
             delay(backoff)
             backoff = (backoff * 2).coerceAtMost(120_000L)
         }

@@ -152,8 +152,9 @@ data class Routine(
     }
 }
 
-data class SonosSpeaker(val name: String, val ip: String)
-data class LgTv(val name: String, val ip: String, val clientKey: String = "", val mac: String = "")
+/** [id] = stable hardware id (Sonos RINCON_…, LG SSDP uuid). Survives IP changes; "" until first discovery. */
+data class SonosSpeaker(val name: String, val ip: String, val id: String = "")
+data class LgTv(val name: String, val ip: String, val clientKey: String = "", val mac: String = "", val id: String = "")
 /** A user-defined HTTP endpoint: any webhook/URL device (Shelly, Tasmota, HA, IFTTT...). */
 data class GenericDevice(val name: String, val url: String, val method: String = "GET", val body: String = "")
 /** One entry in the run history. */
@@ -161,6 +162,7 @@ data class RunLog(val routineName: String, val timestamp: Long, val ok: Boolean,
 
 data class Config(
     val hueBridgeIp: String = "",
+    val hueBridgeId: String = "",                // stable bridge id; lets us find the bridge after an IP change
     val hueAppKey: String = "",
     val sonos: List<SonosSpeaker> = emptyList(),
     val tvs: List<LgTv> = emptyList(),
@@ -196,14 +198,14 @@ data class Config(
     val tileRoutineId: String = ""               // Quick Settings tile routine ("" = none)
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
-        put("hueBridgeIp", hueBridgeIp); put("hueAppKey", hueAppKey)
+        put("hueBridgeIp", hueBridgeIp); put("hueBridgeId", hueBridgeId); put("hueAppKey", hueAppKey)
         put("sonos", JSONArray().also { a ->
-            sonos.forEach { a.put(JSONObject().put("name", it.name).put("ip", it.ip)) }
+            sonos.forEach { a.put(JSONObject().put("name", it.name).put("ip", it.ip).put("id", it.id)) }
         })
         put("tvs", JSONArray().also { a ->
             tvs.forEach {
                 a.put(JSONObject().put("name", it.name).put("ip", it.ip)
-                    .put("clientKey", it.clientKey).put("mac", it.mac))
+                    .put("clientKey", it.clientKey).put("mac", it.mac).put("id", it.id))
             }
         })
         put("anthropicKey", anthropicKey); put("model", model)
@@ -230,7 +232,7 @@ data class Config(
             o.optJSONArray("sonos")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val s = arr.getJSONObject(i)
-                    sp += SonosSpeaker(s.optString("name"), s.optString("ip"))
+                    sp += SonosSpeaker(s.optString("name"), s.optString("ip"), s.optString("id", ""))
                 }
             }
             val tvs = mutableListOf<LgTv>()
@@ -238,11 +240,12 @@ data class Config(
                 for (i in 0 until arr.length()) {
                     val t = arr.getJSONObject(i)
                     tvs += LgTv(t.optString("name"), t.optString("ip"),
-                        t.optString("clientKey"), t.optString("mac"))
+                        t.optString("clientKey"), t.optString("mac"), t.optString("id", ""))
                 }
             }
             return Config(
                 hueBridgeIp = o.optString("hueBridgeIp"),
+                hueBridgeId = o.optString("hueBridgeId", ""),
                 hueAppKey = o.optString("hueAppKey"),
                 sonos = sp, tvs = tvs,
                 anthropicKey = o.optString("anthropicKey"),
@@ -288,4 +291,29 @@ data class Config(
             )
         }
     }
+}
+
+/**
+ * Sonos speakers and LG TVs are referenced by IP throughout (actions, conditions, rooms, bias TV).
+ * After a network move these rewrite every reference at once; [ipMap] is old IP -> new IP and is
+ * applied in one pass, so swapped addresses (A gets B's old IP) stay correct.
+ */
+fun Routine.remapDeviceIps(ipMap: Map<String, String>): Routine {
+    if (ipMap.isEmpty()) return this
+    fun remapAction(a: Action) =
+        if (a.target == TargetType.SONOS || a.target == TargetType.LG_TV) a.copy(deviceId = ipMap[a.deviceId] ?: a.deviceId) else a
+    fun remapCond(c: Cond) =
+        if (c.type == CondType.SPEAKER_IDLE || c.type == CondType.SPEAKER_PLAYING) c.copy(deviceId = ipMap[c.deviceId] ?: c.deviceId) else c
+    return copy(variants = variants.map { v -> v.copy(conditions = v.conditions.map(::remapCond), actions = v.actions.map(::remapAction)) })
+}
+
+fun Config.remapDeviceIps(ipMap: Map<String, String>): Config {
+    if (ipMap.isEmpty()) return this
+    fun ip(old: String) = ipMap[old] ?: old
+    return copy(
+        sonos = sonos.map { it.copy(ip = ip(it.ip)) },
+        tvs = tvs.map { it.copy(ip = ip(it.ip)) },
+        biasTv = ip(biasTv),
+        deviceRooms = deviceRooms.mapKeys { (k, _) -> ip(k) }
+    )
 }

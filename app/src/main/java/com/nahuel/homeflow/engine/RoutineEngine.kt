@@ -104,10 +104,11 @@ object RoutineEngine {
         val variant = pickVariant(routine) ?: return listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
         runCatching { snapshot(routine, variant) }
         val errors = mutableListOf<String>()
+        val moved = mutableMapOf<String, String>()   // devices re-found mid-run: old IP -> new IP
         // Sequential: each action finishes before the next, so off-then-on works.
         for (action in variant.actions) {
             currentCoroutineContext().ensureActive()
-            execute(action).onFailure {
+            executeHealing(action, moved).onFailure {
                 if (it is CancellationException) throw it
                 errors += (it.message ?: "Unbekannter Fehler")
             }
@@ -168,6 +169,20 @@ object RoutineEngine {
             i++
             kotlinx.coroutines.delay(stepMs)
         }
+    }
+
+    /**
+     * Runs [a]; if its device isn't reachable at the stored IP, re-finds moved devices once
+     * (DeviceRelocator.heal) and retries. [moved] carries the new IPs to later actions of this run.
+     */
+    private suspend fun executeHealing(a: Action, moved: MutableMap<String, String>): Result<Unit> {
+        fun relocated(x: Action) =
+            if (x.target == TargetType.SONOS || x.target == TargetType.LG_TV) x.copy(deviceId = moved[x.deviceId] ?: x.deviceId) else x
+        val first = execute(relocated(a))
+        if (first.isSuccess || a.target == TargetType.GENERIC || !DeviceRelocator.isUnreachable(first.exceptionOrNull())) return first
+        val healed = DeviceRelocator.heal() ?: return first
+        moved += healed
+        return execute(relocated(a))
     }
 
     private suspend fun execute(a: Action): Result<Unit> {

@@ -6,11 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
 import java.io.IOException
-import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 
@@ -218,33 +214,20 @@ object SonosClient {
     // ---------- Discovery ----------
 
     suspend fun discover(): List<SonosSpeaker> = withContext(Dispatchers.IO) {
-        val found = mutableMapOf<String, SonosSpeaker>()
-        runCatching {
-            val msg = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\n" +
-                    "MX: 2\r\nST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n\r\n"
-            DatagramSocket().use { socket ->
-                socket.soTimeout = 3000
-                val data = msg.toByteArray()
-                socket.send(DatagramPacket(data, data.size, InetAddress.getByName("239.255.255.250"), 1900))
-                val buf = ByteArray(2048)
-                while (true) {
-                    val packet = DatagramPacket(buf, buf.size)
-                    try { socket.receive(packet) } catch (e: SocketTimeoutException) { break }
-                    val ip = packet.address.hostAddress ?: continue
-                    if (ip !in found) {
-                        val name = fetchRoomName(ip) ?: "Sonos $ip"
-                        found[ip] = SonosSpeaker(name, ip)
-                    }
+        Ssdp.search("urn:schemas-upnp-org:device:ZonePlayer:1")
+            .distinctBy { it.ip }
+            .map { hit ->
+                val desc = fetchDescription(hit.ip)
+                val id = Ssdp.uuidOf(hit.headers["usn"]).ifEmpty {
+                    desc?.let { Regex("<UDN>uuid:([^<]*)</UDN>").find(it)?.groupValues?.get(1) }.orEmpty()
                 }
+                val name = desc?.let { Regex("<roomName>([^<]*)</roomName>").find(it)?.groupValues?.get(1) }
+                SonosSpeaker(name ?: "Sonos ${hit.ip}", hit.ip, id)
             }
-        }
-        found.values.toList()
     }
 
-    private fun fetchRoomName(ip: String): String? = runCatching {
+    private fun fetchDescription(ip: String): String? = runCatching {
         val req = Request.Builder().url("http://$ip:1400/xml/device_description.xml").get().build()
-        Http.local.newCall(req).execute().use { resp ->
-            Regex("<roomName>([^<]*)</roomName>").find(resp.body?.string() ?: "")?.groupValues?.get(1)
-        }
+        Http.local.newCall(req).execute().use { resp -> resp.body?.string() }
     }.getOrNull()
 }

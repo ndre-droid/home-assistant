@@ -96,6 +96,15 @@ object Store {
         write(configFile, _config.value.toJson().toString())
     }
 
+    /** Device IPs changed (new router, DHCP): config + every routine reference in one go. */
+    @Synchronized
+    fun relocateDevices(ipMap: Map<String, String>, block: (Config) -> Config) {
+        updateConfig { block(it.remapDeviceIps(ipMap)) }
+        if (ipMap.isEmpty()) return
+        _routines.value = _routines.value.map { it.remapDeviceIps(ipMap) }
+        persistRoutines()
+    }
+
     private fun persistRoutines() {
         val arr = JSONArray(); _routines.value.forEach { arr.put(it.toJson()) }
         write(routinesFile, arr.toString())

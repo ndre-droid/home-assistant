@@ -511,6 +511,6 @@ private fun RoutinePicker(
 
 /** SSID of the current WiFi, or null when Android redacts it (no location permission / WiFi off). */
 @Suppress("DEPRECATION")
-private fun currentSsid(ctx: android.content.Context): String? = runCatching {
+internal fun currentSsid(ctx: android.content.Context): String? = runCatching {
     ctx.applicationContext.getSystemService(android.net.wifi.WifiManager::class.java).connectionInfo.ssid
 }.getOrNull()?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }

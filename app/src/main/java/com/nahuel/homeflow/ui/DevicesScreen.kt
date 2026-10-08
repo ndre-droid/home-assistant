@@ -28,6 +28,8 @@ import com.nahuel.homeflow.devices.HueClient
 import com.nahuel.homeflow.devices.HueLight
 import com.nahuel.homeflow.devices.LgTvClient
 import com.nahuel.homeflow.devices.SonosClient
+import com.nahuel.homeflow.engine.DeviceRelocator
+import com.nahuel.homeflow.engine.Relocation
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -80,6 +82,20 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var lights by remember { mutableStateOf<List<HueLight>>(emptyList()) }
     var status by remember { mutableStateOf("") }
+    var relocations by remember { mutableStateOf<List<Relocation>?>(null) }
+    var scanning by remember { mutableStateOf(false) }
+
+    fun reconnect() {
+        if (scanning) return
+        scanning = true
+        status = ""
+        scope.launch {
+            val found = runCatching { DeviceRelocator.scan() }
+            scanning = false
+            found.onSuccess { relocations = it.ifEmpty { null }; if (it.isEmpty()) status = "Noch keine Geräte eingerichtet." }
+                .onFailure { status = "Suche fehlgeschlagen: ${it.message}" }
+        }
+    }
 
     fun refreshLights() {
         if (config.hueAppKey.isEmpty()) return
@@ -94,6 +110,7 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().background(Bg).statusBarsPadding()) {
         TopBar("Geräte") {
+            GhostButton(if (scanning) "Suche…" else "Neu verbinden", enabled = !scanning) { reconnect() }
             SecondaryButton("Alles aus") {
                 scope.launch {
                     HueClient.setLight("all", on = false, brightness = null, colorHex = null)
@@ -118,6 +135,14 @@ fun DevicesScreen(modifier: Modifier = Modifier) {
                     )
                     Rule()
                 }
+            }
+
+            relocations?.let { items ->
+                ReconnectPanel(items, onRescan = { reconnect() }, onDone = { msg ->
+                    relocations = null
+                    status = msg
+                    refreshLights()
+                })
             }
 
             HueSection(config, lights, onStatus = { status = it }, onRefresh = { refreshLights() })
@@ -337,12 +362,27 @@ private fun SonosSection(config: Config, onStatus: (String) -> Unit) {
                 scope.launch {
                     val found = SonosClient.discover()
                     if (found.isEmpty()) onStatus("Sonos: nichts gefunden (gleiches WLAN?)")
-                    else Store.updateConfig { cfg ->
-                        // merge by room name: refreshes stale IPs instead of duplicating entries
-                        val byName = cfg.sonos.associateBy { it.name }.toMutableMap()
-                        found.forEach { f -> byName[f.name] = f }
-                        cfg.copy(sonos = byName.values.toList())
-                    }.also { onStatus("Sonos aktualisiert: ${found.joinToString { it.name }}") }
+                    else {
+                        // Merge by stable id, else room name: refreshes stale IPs instead of duplicating
+                        // entries, and moves routine/room references along with a changed IP.
+                        val cfg = Store.config.value
+                        val ipMap = found.mapNotNull { f ->
+                            val old = cfg.sonos.firstOrNull { it.id.isNotEmpty() && it.id == f.id }
+                                ?: cfg.sonos.firstOrNull { it.name == f.name }
+                            old?.takeIf { it.ip != f.ip }?.let { it.ip to f.ip }
+                        }.toMap()
+                        Store.relocateDevices(ipMap) { c ->
+                            val byKey = c.sonos.associateBy { it.id.ifEmpty { it.name } }.toMutableMap()
+                            found.forEach { f ->
+                                val key = c.sonos.firstOrNull { it.id.isNotEmpty() && it.id == f.id }?.id
+                                    ?: c.sonos.firstOrNull { it.name == f.name }?.let { it.id.ifEmpty { it.name } }
+                                    ?: f.id.ifEmpty { f.name }
+                                byKey[key] = f
+                            }
+                            c.copy(sonos = byKey.values.toList())
+                        }
+                        onStatus("Sonos aktualisiert: ${found.joinToString { it.name }}")
+                    }
                     searching = false
                 }
             }
