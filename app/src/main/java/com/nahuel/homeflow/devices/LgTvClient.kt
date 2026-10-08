@@ -3,7 +3,7 @@ package com.nahuel.homeflow.devices
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import java.net.Socket
 import java.net.InetSocketAddress
@@ -88,11 +88,16 @@ object LgTvClient {
         }
         try {
             ws = Http.local.newWebSocket(Request.Builder().url("wss://$ip:3001").build(), listener)
-            withTimeout(30_000) {
+            // withTimeoutOrNull, not withTimeout: its TimeoutCancellationException is a
+            // CancellationException and would silently abort the whole routine instead of failing this step.
+            withTimeoutOrNull(30_000) {
                 val key = keyResult.await()
                 val resp = cmdResult.await()
                 key to resp
-            }
+            } ?: throw IllegalStateException(
+                if (keyResult.isCompleted) "TV antwortet nicht auf den Befehl"
+                else "TV hat die Verbindung nicht bestätigt. Abfrage am TV mit „Zulassen\" bestätigen oder im Geräte-Tab neu koppeln."
+            )
         } finally {
             ws?.close(1000, null)
         }
