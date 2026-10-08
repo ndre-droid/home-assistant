@@ -314,6 +314,12 @@ fun Config.remapDeviceIps(ipMap: Map<String, String>): Config {
         sonos = sonos.map { it.copy(ip = ip(it.ip)) },
         tvs = tvs.map { it.copy(ip = ip(it.ip)) },
         biasTv = ip(biasTv),
-        deviceRooms = deviceRooms.mapKeys { (k, _) -> ip(k) }
+        deviceRooms = deviceRooms.mapKeys { (k, _) -> ip(k) },
+        // HTTP devices pointing at a moved device (e.g. a webhook to the Hue bridge) move with it.
+        generics = generics.map { g ->
+            val host = runCatching { java.net.URI(g.url).host }.getOrNull()
+            val to = host?.let { ipMap[it] }
+            if (to == null) g else g.copy(url = g.url.replaceFirst("//$host", "//$to"))
+        }
     )
 }

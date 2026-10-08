@@ -140,7 +140,8 @@ object DeviceRelocator {
     fun apply(items: List<Relocation>): Map<String, String> {
         val chosen = items.filter { it.changes }
         if (chosen.isEmpty()) return emptyMap()
-        val ipMap = chosen.filter { it.kind != DeviceKind.HUE && it.moves }.associate { it.oldIp to it.target!!.ip }
+        // Hue included: routines never reference the bridge by IP, but HTTP devices may.
+        val ipMap = chosen.filter { it.moves }.associate { it.oldIp to it.target!!.ip }
         fun idsByNewIp(kind: DeviceKind) = chosen.filter { it.kind == kind && it.target!!.id.isNotEmpty() }
             .associate { it.target!!.ip to it.target.id }
         val sonosIds = idsByNewIp(DeviceKind.SONOS)
@@ -154,8 +155,7 @@ object DeviceRelocator {
                 tvs = c.tvs.map { t -> tvIds[t.ip]?.let { t.copy(id = it) } ?: t }
             )
         }
-        val hueMove = chosen.firstOrNull { it.kind == DeviceKind.HUE && it.moves }
-        return if (hueMove != null) ipMap + (hueMove.oldIp to hueMove.target!!.ip) else ipMap
+        return ipMap
     }
 
     // ---------- Auto-heal ----------

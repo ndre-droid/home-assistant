@@ -53,7 +53,7 @@ object RoutineEngine {
         }
         val job = scope.launch {
             val errors = run(routine)
-            Store.logRun(routine.name, errors.isEmpty(), errors.firstOrNull() ?: "")
+            Store.logRun(routine.name, errors.isEmpty(), errors.joinToString("  ·  "))   // all errors, not just the first
             if (errors.isEmpty()) Notifier.result(appCtx, "▶ ${routine.name}", isError = false)
             else Notifier.result(appCtx, "${routine.name}: ${errors.size} Fehler, ${errors.first()}", isError = true)
         }

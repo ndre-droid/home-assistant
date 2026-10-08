@@ -87,6 +87,15 @@ class RelocatorTest {
         assertEquals(mapOf("192.168.0.23" to "room1"), cfg.deviceRooms)
     }
 
+    @Test fun httpDeviceFollowsMovedHost() {
+        val cfg = Config(generics = listOf(
+            GenericDevice("Bridge", "https://192.168.178.26/api/x/groups/0/action", "PUT"),
+            GenericDevice("Shelly", "http://192.168.178.90/relay/0?turn=off")
+        )).remapDeviceIps(mapOf("192.168.178.26" to "192.168.2.40"))
+        assertEquals("https://192.168.2.40/api/x/groups/0/action", cfg.generics[0].url)
+        assertEquals("http://192.168.178.90/relay/0?turn=off", cfg.generics[1].url)
+    }
+
     @Test fun swappedIpsStayCorrect() {
         val map = mapOf("10.0.0.5" to "10.0.0.6", "10.0.0.6" to "10.0.0.5")
         val cfg = Config(sonos = listOf(SonosSpeaker("A", "10.0.0.5"), SonosSpeaker("B", "10.0.0.6"))).remapDeviceIps(map)
