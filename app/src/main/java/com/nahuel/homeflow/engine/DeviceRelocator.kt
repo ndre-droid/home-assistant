@@ -2,6 +2,7 @@ package com.nahuel.homeflow.engine
 
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.devices.HueClient
+import com.nahuel.homeflow.devices.LanSweep
 import com.nahuel.homeflow.devices.LgTvClient
 import com.nahuel.homeflow.devices.SonosClient
 import kotlinx.coroutines.async
@@ -42,27 +43,49 @@ data class Relocation(
  */
 object DeviceRelocator {
 
-    /** Scans the LAN and matches every configured device. Read-only. */
+    /**
+     * Scans the LAN and matches every configured device. Read-only.
+     * Fast pass: SSDP (+ Hue cloud). Anything still missing -> TCP sweep of the phone's /24,
+     * which also finds devices whose multicast answers are filtered or switched off.
+     */
     suspend fun scan(): List<Relocation> = coroutineScope {
         val cfg = Store.config.value
-        val hue = async { if (cfg.hueAppKey.isNotEmpty()) locateHue(cfg.hueBridgeIp, cfg.hueBridgeId, cfg.hueAppKey) else null }
-        val sonos = async {
-            if (cfg.sonos.isEmpty()) emptyList()
-            else match(
-                DeviceKind.SONOS,
-                cfg.sonos.map { Triple(it.name, it.ip, it.id) },
-                SonosClient.discover().map { Candidate(it.ip, it.id, it.name) }
-            )
+        val sonosConf = cfg.sonos.map { Triple(it.name, it.ip, it.id) }
+        val tvConf = cfg.tvs.map { Triple(it.name, it.ip, it.id) }
+        val hueA = async { if (cfg.hueAppKey.isNotEmpty()) locateHue(cfg.hueBridgeIp, cfg.hueBridgeId, cfg.hueAppKey) else null }
+        val sonosA = async { if (sonosConf.isEmpty()) emptyList() else SonosClient.discover().map { Candidate(it.ip, it.id, it.name) } }
+        val tvA = async { if (tvConf.isEmpty()) emptyList() else LgTvClient.discover().map { Candidate(it.ip, it.id, it.name) } }
+        var hue = hueA.await()
+        val sonosFound = sonosA.await().toMutableList()
+        val tvFound = tvA.await().toMutableList()
+        var sonos = match(DeviceKind.SONOS, sonosConf, sonosFound)
+        var tvs = match(DeviceKind.TV, tvConf, tvFound)
+
+        val ports = buildSet {
+            if (hue?.match == Match.MISSING) add(443)
+            if (sonos.any { it.match == Match.MISSING }) add(1400)
+            if (tvs.any { it.match == Match.MISSING }) add(3001)
         }
-        val tvs = async {
-            if (cfg.tvs.isEmpty()) emptyList()
-            else match(
-                DeviceKind.TV,
-                cfg.tvs.map { Triple(it.name, it.ip, it.id) },
-                LgTvClient.discover().map { Candidate(it.ip, it.id, it.name) }
-            )
+        if (ports.isNotEmpty()) {
+            val open = LanSweep.openPorts(ports)
+            val missingHue = hue?.takeIf { it.match == Match.MISSING }
+            if (missingHue != null) {
+                for (ip in open[443].orEmpty()) {
+                    val id = HueClient.verifiedBridgeId(ip, cfg.hueAppKey) ?: continue
+                    hue = missingHue.copy(target = Candidate(ip, id, "Hue Bridge"), match = if (ip == missingHue.oldIp) Match.SAME else Match.EXACT)
+                    break
+                }
+            }
+            open[1400].orEmpty().filter { ip -> sonosFound.none { it.ip == ip } }
+                .mapNotNull { SonosClient.describe(it) }
+                .forEach { sonosFound += Candidate(it.ip, it.id, it.name) }
+            // No id without SSDP: a TV found this way is only ever a GUESS for the user to confirm.
+            open[3001].orEmpty().filter { ip -> tvFound.none { it.ip == ip } }
+                .forEach { tvFound += Candidate(it, "", "LG TV $it") }
+            sonos = match(DeviceKind.SONOS, sonosConf, sonosFound)
+            tvs = match(DeviceKind.TV, tvConf, tvFound)
         }
-        listOfNotNull(hue.await()) + sonos.await() + tvs.await()
+        listOfNotNull(hue) + sonos + tvs
     }
 
     /** The Hue app key itself proves identity: a bridge that accepts it is ours. */

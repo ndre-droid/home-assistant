@@ -107,7 +107,14 @@ fun HomeScreen(
             ) {
                 Icon(Icons.Outlined.ErrorOutline, null, tint = Danger, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(error ?: "", color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(error ?: "", color = Ink, fontSize = 13.sp)
+                    // Connection errors after a router change: point to the fix.
+                    if (Regex("failed to connect|nicht erreichbar|timeout|unreachable", RegexOption.IGNORE_CASE).containsMatchIn(error.orEmpty())) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Neues WLAN / Router? Geräte → Neu verbinden", color = Muted, fontSize = 12.sp)
+                    }
+                }
             }
         }
 

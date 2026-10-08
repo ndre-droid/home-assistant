@@ -216,14 +216,19 @@ object SonosClient {
     suspend fun discover(): List<SonosSpeaker> = withContext(Dispatchers.IO) {
         Ssdp.search("urn:schemas-upnp-org:device:ZonePlayer:1")
             .distinctBy { it.ip }
-            .map { hit ->
-                val desc = fetchDescription(hit.ip)
-                val id = Ssdp.uuidOf(hit.headers["usn"]).ifEmpty {
-                    desc?.let { Regex("<UDN>uuid:([^<]*)</UDN>").find(it)?.groupValues?.get(1) }.orEmpty()
-                }
-                val name = desc?.let { Regex("<roomName>([^<]*)</roomName>").find(it)?.groupValues?.get(1) }
-                SonosSpeaker(name ?: "Sonos ${hit.ip}", hit.ip, id)
-            }
+            .mapNotNull { hit -> describe(hit.ip, Ssdp.uuidOf(hit.headers["usn"])) }
+    }
+
+    /** Speaker at [ip] from its UPnP description; null if no Sonos answers there. */
+    suspend fun describe(ip: String, knownId: String = ""): SonosSpeaker? = withContext(Dispatchers.IO) {
+        val desc = fetchDescription(ip)
+        // Port 1400 alone proves nothing: without an SSDP id, require a Sonos (RINCON) description.
+        if (knownId.isEmpty() && desc?.contains("RINCON_") != true) return@withContext null
+        val id = knownId.ifEmpty {
+            desc?.let { Regex("<UDN>uuid:([^<]*)</UDN>").find(it)?.groupValues?.get(1) }.orEmpty()
+        }
+        val name = desc?.let { Regex("<roomName>([^<]*)</roomName>").find(it)?.groupValues?.get(1) }
+        SonosSpeaker(name ?: "Sonos $ip", ip, id)
     }
 
     private fun fetchDescription(ip: String): String? = runCatching {
