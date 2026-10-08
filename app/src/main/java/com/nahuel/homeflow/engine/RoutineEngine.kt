@@ -190,11 +190,10 @@ object RoutineEngine {
         if (a.target == TargetType.SONOS && a.deviceId == "all") {
             val speakers = Store.config.value.sonos
             if (speakers.isEmpty()) return Result.failure(IllegalArgumentException("Keine Sonos-Speaker konfiguriert"))
-            var lastErr: Throwable? = null
-            speakers.forEach { sp ->
-                execute(a.copy(deviceId = sp.ip)).onFailure { lastErr = it }
-            }
-            return lastErr?.let { Result.failure(it) } ?: Result.success(Unit)
+            // Parallel: one unreachable speaker (retry + timeouts ~16 s) must not hold up the others
+            // or the routine's later steps.
+            val results = coroutineScope { speakers.map { sp -> async { execute(a.copy(deviceId = sp.ip)) } }.awaitAll() }
+            return results.lastOrNull { it.isFailure } ?: Result.success(Unit)
         }
         return when (a.target) {
         TargetType.HUE -> when (a.command) {
