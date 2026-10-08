@@ -81,7 +81,8 @@ object DeviceRelocator {
 
     /**
      * Pure matcher. [configured] = (name, ip, storedId). Order of evidence:
-     * stored id -> same IP (only when no id is stored yet) -> same name -> the single leftover.
+     * stored id -> same IP (only when no id is stored yet) -> same name (also catches a replaced
+     * device in the same room) -> the single leftover (only when no id is stored yet).
      * Each LAN device is claimed at most once.
      */
     fun match(kind: DeviceKind, configured: List<Triple<String, String, String>>, found: List<Candidate>): List<Relocation> {
@@ -103,7 +104,8 @@ object DeviceRelocator {
         configured.forEachIndexed { i, (name, _, _) ->
             if (result[i] == null) free().firstOrNull { it.name.equals(name, ignoreCase = true) }?.let { claim(i, it, Match.GUESS) }
         }
-        val left = configured.indices.filter { result[it] == null }
+        // Leftover guess only without a stored id: with one, an unknown id means a different device.
+        val left = configured.indices.filter { result[it] == null && configured[it].third.isEmpty() }
         if (left.size == 1 && free().size == 1) claim(left.single(), free().single(), Match.GUESS)
 
         return configured.mapIndexed { i, (name, ip, id) ->
