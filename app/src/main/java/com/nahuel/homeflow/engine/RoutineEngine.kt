@@ -52,8 +52,10 @@ object RoutineEngine {
             }
         }
         val job = scope.launch {
-            val errors = run(routine)
-            Store.logRun(routine.name, errors.isEmpty(), errors.joinToString("  ·  "))   // all errors, not just the first
+            val (branch, errors) = runDetailed(routine)
+            // All errors, not just the first; with several branches also which one ran.
+            val where = branch?.takeIf { routine.variants.size > 1 }?.let { "Zweig $it" }
+            Store.logRun(routine.name, errors.isEmpty(), listOfNotNull(where).plus(errors).joinToString("  ·  "))
             if (errors.isEmpty()) Notifier.result(appCtx, "▶ ${routine.name}", isError = false)
             else Notifier.result(appCtx, "${routine.name}: ${errors.size} Fehler, ${errors.first()}", isError = true)
         }
@@ -100,8 +102,11 @@ object RoutineEngine {
         CondType.PARTNER_AWAY -> !TriggerService.partnerRecentlySeen()
     }
 
-    suspend fun run(routine: Routine): List<String> {
-        val variant = pickVariant(routine) ?: return listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
+    suspend fun run(routine: Routine): List<String> = runDetailed(routine).second
+
+    /** Runs the routine; returns the 1-based branch that ran (null = none matched) and the errors. */
+    private suspend fun runDetailed(routine: Routine): Pair<Int?, List<String>> {
+        val variant = pickVariant(routine) ?: return null to listOf("Kein Zweig passt gerade (Bedingungen prüfen)")
         runCatching { snapshot(routine, variant) }
         val errors = mutableListOf<String>()
         val moved = mutableMapOf<String, String>()   // devices re-found mid-run: old IP -> new IP
@@ -110,10 +115,21 @@ object RoutineEngine {
             currentCoroutineContext().ensureActive()
             executeHealing(action, moved).onFailure {
                 if (it is CancellationException) throw it
-                errors += (it.message ?: "Unbekannter Fehler")
+                errors += "${deviceLabel(action)}: ${it.message ?: "Unbekannter Fehler"}"
             }
         }
-        return errors
+        return (routine.variants.indexOf(variant) + 1) to errors
+    }
+
+    /** Which device a failed step targeted, for the history ("Wohnzimmer TV: …"). */
+    private fun deviceLabel(a: Action): String {
+        val cfg = Store.config.value
+        return when (a.target) {
+            TargetType.HUE -> "Hue"
+            TargetType.SONOS -> if (a.deviceId == "all") "Sonos" else cfg.sonos.firstOrNull { it.ip == a.deviceId }?.name ?: "Sonos ${a.deviceId}"
+            TargetType.LG_TV -> cfg.tvs.firstOrNull { it.ip == a.deviceId }?.let { "${it.name} (${it.ip})" } ?: "TV ${a.deviceId}"
+            TargetType.GENERIC -> a.deviceId
+        }
     }
 
     /** True if a specific light was switched off from outside (user intervened) - long-runners then stop. */
