@@ -29,26 +29,29 @@ object RoutineEngine {
     val undo: StateFlow<UndoPoint?> = _undo
     const val UNDO_WINDOW_MS = 15 * 60_000L
 
-    fun runAsync(ctx: Context, routineId: String, toggle: Boolean = true) {
-        val r = Store.routine(routineId) ?: return
-        runAsync(ctx, r, toggle)
+    fun runAsync(ctx: Context, routineId: String, toggle: Boolean = true): Job? {
+        val r = Store.routine(routineId) ?: return null
+        return runAsync(ctx, r, toggle)
     }
+
+    fun isRunning(routineId: String): Boolean = running[routineId]?.isActive == true
 
     /**
      * @param toggle true for user-started runs (tap, widget, NFC, tile, shake, web):
      *   starting a routine that is still running (wake-up fade, party, ...) STOPS it.
      *   Automatic triggers pass false, so a repeated event never cancels a running routine.
+     * @return the new run's job, or null if nothing new started (stopped / already running).
      */
-    fun runAsync(ctx: Context, routine: Routine, toggle: Boolean = true) {
+    fun runAsync(ctx: Context, routine: Routine, toggle: Boolean = true): Job? {
         val appCtx = ctx.applicationContext
         running[routine.id]?.let { job ->
             if (job.isActive) {
-                if (!toggle) return
+                if (!toggle) return null
                 job.cancel()
                 running.remove(routine.id)
                 Store.logRun(routine.name, true, "gestoppt")
                 Notifier.result(appCtx, "⏹ ${routine.name} gestoppt", isError = false)
-                return
+                return null
             }
         }
         val job = scope.launch {
@@ -61,6 +64,7 @@ object RoutineEngine {
         }
         running[routine.id] = job
         job.invokeOnCompletion { running.remove(routine.id) }
+        return job
     }
 
     /** Restores the lights to how they were before the last routine. */

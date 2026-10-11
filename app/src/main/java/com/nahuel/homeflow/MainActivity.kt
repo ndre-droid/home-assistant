@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.nahuel.homeflow.engine.RoutineEngine
+import com.nahuel.homeflow.engine.RoutineRunService
 import com.nahuel.homeflow.devices.SpotifyClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -135,11 +136,9 @@ class MainActivity : ComponentActivity() {
             return
         }
         if (data.scheme == "homeflow" && data.host == "run") {
-            val id = data.lastPathSegment ?: return
-            // NFC tags are physical and were written by this app: run directly.
-            // Anything else (VIEW from a web page / other app) needs a confirmation tap.
-            if (intent.action == NfcAdapter.ACTION_NDEF_DISCOVERED) RoutineEngine.runAsync(this, id)
-            else linkRunId.value = id
+            // VIEW from a web page / other app needs a confirmation tap.
+            // (Tags go to NfcRunActivity, or runFromTag while this screen is open.)
+            linkRunId.value = data.lastPathSegment ?: return
         }
     }
 
@@ -150,7 +149,7 @@ class MainActivity : ComponentActivity() {
         val uri = msgs.filterIsInstance<NdefMessage>().flatMap { it.records.toList() }
             .firstNotNullOfOrNull { rec -> runCatching { rec.toUri() }.getOrNull() }
             ?.takeIf { it.scheme == "homeflow" && it.host == "run" } ?: return false
-        uri.lastPathSegment?.let { RoutineEngine.runAsync(this, it) }
+        uri.lastPathSegment?.let { RoutineRunService.start(this, it) }
         return true
     }
 

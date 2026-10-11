@@ -36,16 +36,26 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- NFC tag taps: tags are written with homeflow://run/<routineId> -->
-            <intent-filter>
-                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="homeflow" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="homeflow" />
+            </intent-filter>
+        </activity>
+
+        <!-- NFC tag taps (tags are written with homeflow://run/<routineId>): runs without showing the app -->
+        <activity
+            android:name=".NfcRunActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleInstance">
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="homeflow" />
             </intent-filter>
         </activity>
@@ -63,6 +73,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Listens to local smart home device state changes to fire user-defined automations" />
+        </service>
+
+        <!-- Short-lived: keeps a routine started from an NFC tag alive until it finishes -->
+        <service
+            android:name=".engine.RoutineRunService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs a user-started home automation routine to completion" />
         </service>
 
         <receiver android:name=".engine.AlarmReceiver" android:exported="false" />
