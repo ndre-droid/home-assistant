@@ -79,12 +79,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
             val presets = listOf(
                 "" to "Standard", "#3B6EF5" to "Blau", "#7C74E8" to "Violett",
-                "#1D9E75" to "Teal", "#E0A558" to "Amber", "#EC5F9E" to "Pink"
+                "#1D9E75" to "Teal", "#F0705A" to "Koralle", "#EC5F9E" to "Pink"
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 presets.forEach { (hex, name) ->
                     val selected = config.accentColor == hex
-                    val swatch = if (hex.isEmpty()) Color(0xFF3B6EF5) else Color(android.graphics.Color.parseColor(hex))
+                    val swatch = if (hex.isEmpty()) Color(0xFFF0B45E) else Color(android.graphics.Color.parseColor(hex))
                     Box(
                         Modifier.size(34.dp).clip(CircleShape).background(swatch)
                             .border(

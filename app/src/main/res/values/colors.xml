@@ -1,6 +1,6 @@
 <resources>
-    <color name="ic_bg">#0F0F0F</color>
-    <color name="accent">#1ED760</color>
-    <color name="widget_bg">#1B1B1B</color>
-    <color name="widget_text">#F2F3F7</color>
+    <color name="ic_bg">#0B0C0D</color>
+    <color name="accent">#F0B45E</color>
+    <color name="widget_bg">#17191C</color>
+    <color name="widget_text">#EDEBE7</color>
 </resources>
