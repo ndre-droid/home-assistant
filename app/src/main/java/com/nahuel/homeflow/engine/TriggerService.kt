@@ -25,6 +25,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -51,6 +52,8 @@ class TriggerService : Service() {
     private var partnerWatcher: Job? = null
     private var netCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var wifiConnected = false
+    /** True if the current WiFi is proven to be home (SSID match or Hue bridge reachable over it). */
+    @Volatile private var wifiIsHome = false
     private var sensorManager: SensorManager? = null
     private var shakeListener: SensorEventListener? = null
     private var lastShake = 0L
@@ -124,9 +127,10 @@ class TriggerService : Service() {
         val cb = if (Build.VERSION.SDK_INT >= 31) {
             // FLAG_INCLUDE_LOCATION_INFO: without it the SSID in WifiInfo is redacted.
             object : ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
-                override fun onAvailable(network: Network) { wifiConnected = true }
+                override fun onAvailable(network: Network) { wifiConnected = true; probeHome(network) }
                 override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
                     (caps.transportInfo as? WifiInfo)?.ssid?.let { currentSsid = cleanSsid(it) }
+                    if (!wifiIsHome && ssidIsHome(currentSsid)) wifiIsHome = true
                 }
                 override fun onLost(network: Network) = onWifiLost()
             }
@@ -138,12 +142,40 @@ class TriggerService : Service() {
                     currentSsid = runCatching {
                         cleanSsid(applicationContext.getSystemService(WifiManager::class.java).connectionInfo.ssid)
                     }.getOrNull()
+                    probeHome(network)
                 }
                 override fun onLost(network: Network) = onWifiLost()
             }
         }
         netCallback = cb
         runCatching { cm.registerNetworkCallback(req, cb) }
+    }
+
+    private fun ssidIsHome(ssid: String?): Boolean {
+        val home = Store.config.value.homeWifiSsid.trim()
+        return home.isNotEmpty() && ssid != null && ssid.equals(home, ignoreCase = true)
+    }
+
+    /**
+     * Decides whether the WiFi that just came up is home: SSID match, or the Hue bridge answers
+     * over exactly this network. Unknown SSID alone no longer counts - otherwise losing a train or
+     * cafe WiFi fired "leave home" while away (and failed, since the bridge is LAN-only).
+     */
+    private fun probeHome(network: Network) {
+        wifiIsHome = ssidIsHome(currentSsid)
+        val bridge = Store.config.value.hueBridgeIp
+        if (wifiIsHome || bridge.isBlank()) return
+        scope.launch {
+            // Retry briefly: right after onAvailable the link may not route yet.
+            repeat(3) { attempt ->
+                if (!wifiConnected || wifiIsHome) return@launch
+                val ok = runCatching {
+                    network.socketFactory.createSocket().use { it.connect(InetSocketAddress(bridge, 443), 1500) }
+                }.isSuccess
+                if (ok && wifiConnected) { wifiIsHome = true; return@launch }
+                delay(2000L * (attempt + 1))
+            }
+        }
     }
 
     private fun cleanSsid(raw: String?): String? =
@@ -153,14 +185,13 @@ class TriggerService : Service() {
         // Debounce flaky wifi: wait, then only fire if STILL disconnected.
         if (!wifiConnected) return
         wifiConnected = false
-        val lostSsid = currentSsid
+        val wasHome = wifiIsHome || ssidIsHome(currentSsid)
+        wifiIsHome = false
         currentSsid = null
+        if (!wasHome) return     // some other WiFi (train, cafe, work): not leaving home
         scope.launch {
             delay(8000)          // grace period for brief dropouts
             if (wifiConnected) return@launch
-            val home = Store.config.value.homeWifiSsid.trim()
-            // Home WiFi set: only leaving THAT network counts. Unknown SSID = assume home (old behaviour).
-            if (home.isNotEmpty() && lostSsid != null && !lostSsid.equals(home, ignoreCase = true)) return@launch
             runCatching { onWifiLeft() }
         }
     }
