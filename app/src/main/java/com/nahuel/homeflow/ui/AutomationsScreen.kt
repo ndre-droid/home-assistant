@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -104,6 +106,15 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (!sortMode) {
+                // ---- Next scheduled run: big glowing hero ----
+                val next = routines
+                    .mapNotNull { r -> nextFireFor(r, config.latitude, config.longitude)?.let { r to it } }
+                    .minByOrNull { it.second }
+                if (next != null) item {
+                    NextRunHero(next.first, next.second,
+                        onRun = { RoutineEngine.runAsync(ctx, next.first) },
+                        onEdit = { onEdit(next.first.id) })
+                }
                 // ---- Create ----
                 item {
                     FlatBlock {
@@ -537,4 +548,49 @@ fun triggerLabel(t: TriggerType): String = when (t) {
     TriggerType.SUN -> "Sonnenauf-/untergang"
     TriggerType.ARRIVE_HOME -> "Beim Nachhausekommen"
     TriggerType.LEAVE_HOME -> "Beim Verlassen (GPS)"
+}
+
+
+/** Big gradient card for the next scheduled routine, in its own light colours. */
+@Composable
+private fun NextRunHero(r: Routine, at: Long, onRun: () -> Unit, onEdit: () -> Unit) {
+    val cols = routineColors(r)
+    val ink = inkOn(cols)
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+            .glow(cols[1], radius = 26.dp, corner = 28.dp, alpha = 0.6f, offsetY = 10.dp)
+            .clip(shape)
+            .background(Brush.linearGradient(cols))
+            .drawBehind {
+                drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.32f), Color.Transparent),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, 0f), radius = size.maxDimension * 0.7f))
+            }
+            .border(RuleWidth, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.5f), Color.Transparent)), shape)
+            .padding(22.dp)
+    ) {
+        Text("Als Nächstes · ${formatWhen(at)}", color = ink.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(2.dp))
+        Text(r.name.ifEmpty { "Unbenannt" }, color = ink, fontSize = 26.sp, fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.6).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(routineSummary(r), color = ink.copy(alpha = 0.85f), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(44.dp).shadow(6.dp, CircleShape).clip(CircleShape)
+                    .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F0E8))))
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onRun).padding(horizontal = 18.dp)
+            ) { Text("Jetzt starten", color = Color(0xFF2A1410), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(44.dp).clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .border(RuleWidth, Color.White.copy(alpha = 0.25f), CircleShape)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onEdit).padding(horizontal = 18.dp)
+            ) { Text("Bearbeiten", color = ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+        }
+    }
 }

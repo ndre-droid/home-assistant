@@ -48,7 +48,7 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
       - name: Publish APK as release (direct download, no login)
-        if: github.ref == 'refs/heads/redesign/glow'
+        if: github.ref == 'refs/heads/redesign/glow' || github.ref == 'refs/heads/redesign/dark-calm'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

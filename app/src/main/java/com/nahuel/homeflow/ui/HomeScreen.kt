@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -177,6 +178,40 @@ fun HomeScreen(
             }
         }
         UndoBar()
+
+        // ---- Now playing (first speaker that plays) ----
+        val playing = config.sonos.firstOrNull { speakers[it.ip]?.playing == true }
+        if (playing != null) {
+            val st = speakers[playing.ip]
+            Spacer(Modifier.height(20.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .litCard()
+                    .drawBehind {
+                        drawRect(Brush.radialGradient(listOf(Color(0xFFFFB46A).copy(alpha = 0.16f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(0f, size.height / 2), radius = size.width * 0.6f))
+                    }
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val art = listOf(Color(0xFFFFD890), Color(0xFFF2786A))
+                Box(
+                    Modifier.size(48.dp).glow(art[1], radius = 12.dp, corner = 15.dp, alpha = 0.6f, offsetY = 4.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp)).background(Brush.linearGradient(art)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Outlined.MusicNote, null, tint = Color(0xFF1A1208), modifier = Modifier.size(20.dp)) }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(st?.title?.ifEmpty { null } ?: "Spielt", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(playing.name, color = Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                RoundIconButton(Icons.Outlined.Pause, "Pause", size = 44.dp, fill = Color(0xFFF1ECE4), tint = Color(0xFF141210)) {
+                    scope.launch { HomeRepo.togglePlay(playing.ip) }
+                }
+            }
+        }
 
         // ---- Rooms ----
         if (rooms.isNotEmpty() || (!loaded && !nothingSetUp)) {
