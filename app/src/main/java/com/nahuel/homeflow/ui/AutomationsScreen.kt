@@ -6,16 +6,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,42 +70,33 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
 
     Box(modifier.fillMaxSize().statusBarsPadding()) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 360.dp),
+            columns = GridCells.Fixed(1),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item(span = { GridItemSpan(1) }) {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 6.dp, top = 6.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "${routines.count { it.enabled }} aktiv · ${routines.count { !it.enabled }} aus",
-                                color = TextSec, fontSize = 13.sp
-                            )
-                            ScreenTitle("Flows")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            ScreenTitle(greeting())
+                            Text("Deine Automationen", color = TextSec, fontSize = 13.sp)
                         }
+                        Spacer(Modifier.weight(1f))
                         if (routines.size > 1) {
                             TextButton(onClick = { sortMode = !sortMode }) {
                                 Text(if (sortMode) "Fertig" else "Sortieren", color = Violet, fontSize = 13.sp)
                             }
                         }
-                        GlassIconButton(Icons.Outlined.History, "Verlauf", tint = TextSec) { showHistory.value = true }
-                        Spacer(Modifier.width(8.dp))
-                        AddButton { showAddChooser.value = true }
-                    }
-                    val next = nextScheduled(routines, Store.config.value.latitude, Store.config.value.longitude)
-                    if (next != null && !sortMode) {
-                        Spacer(Modifier.height(16.dp))
-                        NextFlowHero(next.first, next.second,
-                            onRun = { RoutineEngine.runAsync(ctx, next.first) },
-                            onEdit = { onEdit(next.first.id) })
+                        IconButton(onClick = { showHistory.value = true }) {
+                            Icon(Icons.Outlined.History, "Verlauf", tint = TextSec)
+                        }
                     }
                     if (routines.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(
                             if (sortMode) "Halte ☰ und ziehe an die neue Position."
-                            else "Tippen = ausführen · Schalter oder Halten = an/aus · Stift = bearbeiten",
+                            else "Tippen = ausführen · Halten = an/aus (grau = aus) · ✎ = bearbeiten",
                             color = TextSec, fontSize = 11.sp
                         )
                     }
@@ -123,7 +104,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 }
             }
             if (routines.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(span = { GridItemSpan(1) }) {
                     GradientCard {
                         Text("Noch keine Automationen", color = TextPrim, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
@@ -132,7 +113,7 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                 }
             }
             if (sortMode) {
-                itemsIndexed(order, key = { _, r -> r.id }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { i, r ->
+                itemsIndexed(order, key = { _, r -> r.id }) { i, r ->
                     val dragged = r.id == dragId
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -205,8 +186,19 @@ fun AutomationsScreen(modifier: Modifier = Modifier, onEdit: (String) -> Unit, o
                     )
                 }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(24.dp)) }
+            item(span = { GridItemSpan(1) }) { Spacer(Modifier.height(88.dp)) }
         }
+
+        ExtendedFloatingActionButton(
+            onClick = { showAddChooser.value = true },
+            containerColor = Violet,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+            text = { Text("Neu") },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        )
 
         if (showAddChooser.value) {
             AlertDialog(
@@ -300,7 +292,7 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
     // Start confirmation: tile flashes in the accent, icon pops, subtitle says it's running.
     var runFlash by remember { mutableStateOf(false) }
     val tileBg by animateColorAsState(
-        targetValue = if (runFlash) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f) else Color.Transparent,
+        targetValue = if (runFlash) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f) else Surface1,
         animationSpec = tween(220), label = "tileBg"
     )
     val iconScale by animateFloatAsState(
@@ -313,13 +305,10 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
-            .graphicsLayer { alpha = if (r.enabled) 1f else 0.5f }
-            .shadow(8.dp, MaterialTheme.shapes.medium, ambientColor = Color.Black, spotColor = Color.Black)
+            .height(84.dp)
+            .graphicsLayer { alpha = if (r.enabled) 1f else 0.45f }
             .clip(MaterialTheme.shapes.medium)
-            .background(CardGradient)
             .background(tileBg)
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (IsDark) 0.07f else 0.5f), Color.Transparent)), MaterialTheme.shapes.medium)
             .pressScale(interaction)
             .combinedClickable(
                 interactionSource = interaction,
@@ -330,20 +319,22 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
                     onToggle()
                 }
             )
-            .padding(horizontal = 14.dp)
+            .padding(10.dp)
     ) {
-        // glowing scene orb in the routine's own light colours
-        val cols = routineColors(r)
+        // large rounded album-art thumbnail (Sonos aesthetic)
         Box(
             Modifier
-                .size(52.dp)
-                .shadow(12.dp, CircleShape, ambientColor = cols[1], spotColor = cols[1])
-                .clip(CircleShape)
-                .background(Brush.linearGradient(cols)),
+                .size(64.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(Surface2, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                routineIcon(r), fontSize = 22.sp,
+                routineIcon(r), fontSize = 30.sp,
                 modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }
             )
         }
@@ -367,69 +358,25 @@ private fun RoutineTile(r: Routine, onRun: () -> Unit, onEdit: () -> Unit, onTog
                 overflow = TextOverflow.Ellipsis
             )
         }
-        GlassIconButton(Icons.Outlined.Edit, "Bearbeiten", size = 40.dp, tint = TextSec, onClick = onEdit)
-        Spacer(Modifier.width(10.dp))
-        GlowSwitch(checked = r.enabled, onCheckedChange = { onToggle() }, label = r.name)
-        Spacer(Modifier.width(6.dp))
-    }
-}
-
-/** Accent "+" with a soft glow. */
-@Composable
-private fun AddButton(onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(44.dp)
-            .shadow(12.dp, CircleShape, ambientColor = accent, spotColor = accent)
-            .clip(CircleShape)
-            .background(Brush.radialGradient(listOf(androidx.compose.ui.graphics.lerp(accent, Color.White, 0.35f), accent)))
-            .semantics { contentDescription = "Neu anlegen" }
-            .bouncyClick(onClick)
-    ) { Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.onPrimary) }
-}
-
-/** Big gradient card for the next scheduled flow. */
-@Composable
-private fun NextFlowHero(r: Routine, at: Long, onRun: () -> Unit, onEdit: () -> Unit) {
-    val cols = routineColors(r)
-    val ink = inkOn(cols)
-    val shape = RoundedCornerShape(28.dp)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .shadow(22.dp, shape, ambientColor = cols[1], spotColor = cols[1])
-            .clip(shape)
-            .background(Brush.linearGradient(cols))
-            .drawBehind {
-                drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.32f), Color.Transparent),
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, 0f), radius = size.maxDimension * 0.7f))
-            }
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.5f), Color.Transparent)), shape)
-            .padding(22.dp)
-    ) {
-        Text("Als Nächstes · ${hhmm(at)}", color = ink.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Text(r.name, color = ink, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.6).sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(r.triggers.joinToString(" · ") { triggerLabel(it.type) }, color = ink.copy(alpha = 0.85f), fontSize = 13.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.height(44.dp).shadow(6.dp, CircleShape).clip(CircleShape)
-                    .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F0E8))))
-                    .bouncyClick(onRun).padding(horizontal = 18.dp)
-            ) { Text("Jetzt starten", color = Color(0xFF2A1410), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.height(44.dp).clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-                    .bouncyClick(onEdit).padding(horizontal = 18.dp)
-            ) { Text("Bearbeiten", color = ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+        if (!r.enabled) {
+            Text(
+                "AUS", color = TextSec, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(Surface2)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            )
         }
+        Text(
+            "✎",
+            color = TextSec,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .padding(end = 8.dp)
+                .clip(MaterialTheme.shapes.small)
+                .bouncyClick(onEdit)
+                .padding(8.dp)
+        )
     }
 }
 
