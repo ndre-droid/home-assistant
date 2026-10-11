@@ -105,14 +105,27 @@ fun HomeScreen(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.ErrorOutline, null, tint = Danger, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(error ?: "", color = Ink, fontSize = 13.sp)
-                    // Connection errors after a router change: point to the fix.
-                    if (Regex("failed to connect|nicht erreichbar|timeout|unreachable", RegexOption.IGNORE_CASE).containsMatchIn(error.orEmpty())) {
+                val unreachable = Regex("failed to connect|nicht erreichbar|timeout|unreachable", RegexOption.IGNORE_CASE)
+                    .containsMatchIn(error.orEmpty())
+                if (unreachable && !isOnWifi(ctx)) {
+                    // Away from home: devices are LAN-only, so this is expected - not an error.
+                    Icon(Icons.Outlined.WifiOff, null, tint = Muted, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Nicht im Heimnetz", color = Ink, fontSize = 13.sp)
                         Spacer(Modifier.height(4.dp))
-                        Text("Neues WLAN / Router? Geräte → Neu verbinden", color = Muted, fontSize = 12.sp)
+                        Text("Geräte sind nur im WLAN zu Hause steuerbar.", color = Muted, fontSize = 12.sp)
+                    }
+                } else {
+                    Icon(Icons.Outlined.ErrorOutline, null, tint = Danger, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(error ?: "", color = Ink, fontSize = 13.sp)
+                        // Connection errors after a router change: point to the fix.
+                        if (unreachable) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("Neues WLAN / Router? Geräte → Neu verbinden", color = Muted, fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -369,5 +382,14 @@ private fun UndoBar() {
             color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/** True if any connected network is WiFi (LAN devices can only be reached over it). */
+private fun isOnWifi(ctx: android.content.Context): Boolean {
+    val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+    @Suppress("DEPRECATION")
+    return cm.allNetworks.any {
+        cm.getNetworkCapabilities(it)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
     }
 }
