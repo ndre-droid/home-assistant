@@ -12,7 +12,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
@@ -30,10 +32,10 @@ import com.nahuel.homeflow.R
 // ---------------------------------------------------------------------------
 
 // Dark
-private val Ground = Color(0xFF0C0D0E)
-private val Surface1 = Color(0xFF16181A)
-private val Surface2 = Color(0xFF1F2225)
-private val Line = Color(0xFF23272A)
+private val Ground = Color(0xFF0B0C0D)
+private val Surface1 = Color(0xFF17191C)
+private val Surface2 = Color(0xFF22252A)
+private val Line = Color(0xFF26292D)
 private val InkD = Color(0xFFEDEBE7)
 private val MutedD = Color(0xFFA3A19C)
 private val FaintD = Color(0xFF5C5F62)
@@ -169,6 +171,22 @@ val Faint: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorSche
 
 /** Errors and failed runs. */
 val Danger: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.error
+
+/** True when the active scheme is dark (also with wallpaper colours). */
+val IsDark: Boolean @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+/** Card fill that reads as softly lit: a hair lighter at the top. */
+val CardBrush: Brush
+    @Composable @ReadOnlyComposable get() {
+        val c = MaterialTheme.colorScheme.surface
+        val top = if (IsDark) Color.White.copy(alpha = 0.035f).compositeOver(c) else c
+        return Brush.verticalGradient(listOf(top, c))
+    }
+
+/** Thin top highlight that gives cards and buttons their edge of light. */
+val EdgeLight: Brush
+    @Composable @ReadOnlyComposable get() =
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = if (IsDark) 0.08f else 0.55f), Color.Transparent))
 
 /** Hairline weight. */
 val RuleWidth = 1.dp
