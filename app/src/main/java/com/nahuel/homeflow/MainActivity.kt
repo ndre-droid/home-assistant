@@ -254,8 +254,16 @@ private fun AppRoot(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Bg)) {
-        val wide = maxWidth >= 600.dp
+    // Keep content clear of the camera cutout in every rotation (cover + inner display).
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(Bg)
+            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+    ) {
+        val wide = maxWidth >= 600.dp            // rail instead of bottom pill
+        val twoPane = maxWidth >= 840.dp         // inner display landscape: list | room, split at the fold
+        val stacked = wide && !twoPane && maxHeight >= 800.dp  // inner display portrait: list over room
+        val short = maxHeight < 600.dp
+        val listWidth = (maxWidth / 2 - 84.dp).coerceAtLeast(320.dp)
         when {
             showCapture -> SceneCaptureScreen(onClose = { showCapture = false })
             showEditor -> EditRoutineScreen(
@@ -264,16 +272,24 @@ private fun AppRoot(
                 onRequestNfcWrite = onRequestNfcWrite
             )
             wide -> Row(Modifier.fillMaxSize().navigationBarsPadding()) {
-                FlatNavRail(navItems, tab.ordinal, selectTab)
-                if (tab == Tab.HOME) {
-                    val sel = roomId?.takeIf { id -> rooms.any { it.id == id } } ?: rooms.firstOrNull()?.id
-                    TabContent(Tab.HOME, Modifier.width(380.dp).fillMaxHeight(), wide = true)
-                    Box(Modifier.fillMaxHeight().width(RuleWidth).background(Divider))
-                    if (sel != null) RoomScreen(sel, Modifier.weight(1f).fillMaxHeight(), onBack = null)
-                    else Box(Modifier.weight(1f).fillMaxHeight().background(Bg))
-                } else {
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-                        TabContent(tab, Modifier.widthIn(max = 720.dp), wide = true)
+                FlatNavRail(navItems, tab.ordinal, selectTab, centered = short)
+                val sel = roomId?.takeIf { id -> rooms.any { it.id == id } } ?: rooms.firstOrNull()?.id
+                when {
+                    tab == Tab.HOME && twoPane -> {
+                        TabContent(Tab.HOME, Modifier.width(listWidth).fillMaxHeight(), wide = true)
+                        if (sel != null) RoomScreen(sel, Modifier.weight(1f).fillMaxHeight(), onBack = null)
+                        else Box(Modifier.weight(1f).fillMaxHeight())
+                    }
+                    tab == Tab.HOME && stacked -> Column(Modifier.weight(1f).fillMaxHeight()) {
+                        TabContent(Tab.HOME, Modifier.weight(1f).fillMaxWidth(), wide = true)
+                        if (sel != null) RoomScreen(sel, Modifier.weight(1f).fillMaxWidth(), onBack = null)
+                    }
+                    tab == Tab.HOME && roomId != null -> {
+                        BackHandler { roomId = null }
+                        RoomScreen(roomId!!, Modifier.weight(1f).fillMaxHeight(), onBack = { roomId = null })
+                    }
+                    else -> Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                        TabContent(tab, Modifier.widthIn(max = 720.dp), wide = false)
                     }
                 }
             }

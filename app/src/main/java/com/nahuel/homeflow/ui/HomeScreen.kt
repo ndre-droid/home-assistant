@@ -17,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -68,10 +70,12 @@ fun HomeScreen(
     val playingCount = speakers.values.count { it.playing }
     val nothingSetUp = config.hueAppKey.isEmpty() && config.sonos.isEmpty() && config.tvs.isEmpty()
 
+    val glow = lights.firstOrNull { it.on }?.let { lightColor(it) } ?: Accent
     Column(
         modifier
             .fillMaxSize()
             .background(Bg)
+            .ambientGlow(glow)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
@@ -89,7 +93,7 @@ fun HomeScreen(
                 }.joinToString(" · ")
                 Text(summary, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(6.dp))
-                Text(greeting(), color = Ink, fontSize = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.6).sp)
+                Text(greeting(), color = Ink, fontSize = 32.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.9).sp)
             }
             RoundIconButton(Icons.Outlined.History, "Verlauf") { showHistory = true }
         }
@@ -151,15 +155,23 @@ fun HomeScreen(
         LaunchedEffect(activeId) { if (activeId != null) { delay(2500); activeId = null } }
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             scenes.forEach { r ->
-                SceneTile(r.name, routineVector(r), active = activeId == r.id) {
+                SceneOrb(
+                    colors = routineColors(r), label = r.name,
+                    icon = routineVector(r), emoji = r.icon,
+                    selected = activeId == r.id
+                ) {
                     activeId = r.id
                     RoutineEngine.runAsync(ctx, r)
                 }
             }
-            SceneTile("Alles aus", Icons.Outlined.PowerSettingsNew, active = activeId == "_off") {
+            SceneOrb(
+                colors = listOf(Color(0xFF4A4E55), Color(0xFF26292D), Color(0xFF141618)),
+                label = "Alles aus", icon = Icons.Outlined.PowerSettingsNew,
+                selected = activeId == "_off"
+            ) {
                 activeId = "_off"
                 scope.launch { HomeRepo.allOff() }
             }
@@ -175,31 +187,15 @@ fun HomeScreen(
         if (rooms.isEmpty() && !loaded && !nothingSetUp) {
             Caption("Lade Geräte …")
         }
-        val (big, rest) = rooms.firstOrNull() to rooms.drop(1)
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            big?.let { room ->
+            rooms.forEach { room ->
                 RoomCard(
-                    room, big = true, selected = room.id == selectedRoomId,
+                    room, selected = room.id == selectedRoomId,
                     speakers = speakers, tvOn = tvOn,
                     onOpen = { onOpenRoom(room.id) },
                     onToggle = { on -> scope.launch { HomeRepo.setLights(room.lights.map { it.id }, on) } },
                     onBrightness = { b -> scope.launch { HomeRepo.setLights(room.lights.map { it.id }, true, b) } }
                 )
-            }
-            rest.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    pair.forEach { room ->
-                        RoomCard(
-                            room, big = false, selected = room.id == selectedRoomId,
-                            speakers = speakers, tvOn = tvOn,
-                            modifier = Modifier.weight(1f),
-                            onOpen = { onOpenRoom(room.id) },
-                            onToggle = { on -> scope.launch { HomeRepo.setLights(room.lights.map { it.id }, on) } },
-                            onBrightness = {}
-                        )
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
             }
         }
 
@@ -212,13 +208,23 @@ fun HomeScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(CardShape)
-                    .background(Card)
+                    .litCard()
                     .clickable(onClick = onOpenAutomations)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconTile(triggerVector(next.first.triggers.firstOrNull { it.type == TriggerType.SUN || it.type == TriggerType.TIME }?.type), tint = AccentText)
+                val cols = routineColors(next.first)
+                Box(
+                    Modifier.size(40.dp)
+                        .shadow(10.dp, CircleShape, ambientColor = cols[1], spotColor = cols[1])
+                        .clip(CircleShape).background(Brush.linearGradient(cols)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        triggerVector(next.first.triggers.firstOrNull { it.type == TriggerType.SUN || it.type == TriggerType.TIME }?.type),
+                        null, tint = inkOn(cols).copy(alpha = 0.85f), modifier = Modifier.size(18.dp)
+                    )
+                }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Als Nächstes · ${formatWhen(next.second)}", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -246,50 +252,8 @@ private fun greeting(): String {
 }
 
 @Composable
-private fun SceneTile(label: String, icon: ImageVector, active: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(80.dp)
-            .height(84.dp)
-            .clip(TileShape)
-            .background(Card)
-            .then(if (active) Modifier.border(1.5.dp, Accent, TileShape) else Modifier)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(icon, contentDescription = null, tint = if (active) AccentText else Ink, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(8.dp))
-        Text(
-            label, color = if (active) AccentText else Ink, fontSize = 12.sp,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-            maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun LightDots(lights: List<HueLight>) {
-    Row {
-        lights.take(3).forEachIndexed { i, l ->
-            Box(
-                Modifier
-                    .padding(start = if (i == 0) 0.dp else 0.dp)
-                    .offset(x = (-4 * i).dp)
-                    .size(16.dp)
-                    .border(2.dp, Card, CircleShape)
-                    .clip(CircleShape)
-                    .background(lightColor(l))
-            )
-        }
-    }
-}
-
-@Composable
 private fun RoomCard(
     room: RoomInfo,
-    big: Boolean,
     selected: Boolean,
     speakers: Map<String, SpeakerState>,
     tvOn: Map<String, Boolean>,
@@ -298,64 +262,48 @@ private fun RoomCard(
     onToggle: (Boolean) -> Unit,
     onBrightness: (Int) -> Unit
 ) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(if (selected) Fill else Card)
-            .clickable(onClick = onOpen)
-            .padding(if (big) 18.dp else 16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    room.name, color = Ink, fontSize = if (big) 17.sp else 16.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
-                )
-                if (big) Icon(Icons.Outlined.ChevronRight, null, tint = Muted, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            FlatToggle(room.anyOn, enabled = room.lights.isNotEmpty()) { onToggle(it) }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (room.anyOn) {
-                LightDots(room.onLights)
-                Spacer(Modifier.width(4.dp))
-            }
-            Text(
-                when {
-                    room.lights.isEmpty() -> "Keine Lichter"
-                    room.anyOn -> "${room.onLights.size} von ${room.lights.size} · ${room.avgBrightness} %"
-                    else -> "Licht aus"
-                },
-                color = Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (big && room.anyOn) {
-            Spacer(Modifier.height(4.dp))
-            LevelSlider(room.avgBrightness, color = lightColor(room.onLights.first())) { onBrightness(it) }
-        }
-        val media = room.speakers.map { s ->
-            Triple(Icons.Outlined.Speaker, s.name, when (speakers[s.ip]?.playing) { true -> "spielt"; false -> "pausiert"; null -> "…" })
-        } + room.tvs.map { t ->
-            Triple(Icons.Outlined.Tv, t.name, when (tvOn[t.ip]) { true -> "an"; false -> "aus"; null -> "…" })
-        }
+    val media = room.speakers.map { s ->
+        Triple(Icons.Outlined.Speaker, s.name, when (speakers[s.ip]?.playing) { true -> "spielt"; false -> "pausiert"; null -> "…" })
+    } + room.tvs.map { t ->
+        Triple(Icons.Outlined.Tv, t.name, when (tvOn[t.ip]) { true -> "an"; false -> "aus"; null -> "…" })
+    }
+    DimmerCard(
+        title = room.name,
+        on = room.anyOn,
+        brightness = room.avgBrightness,
+        colors = lightsGradient(room.onLights.map { lightColor(it) }.distinct()),
+        modifier = modifier,
+        subtitle = when {
+            room.lights.isEmpty() -> "Keine Lichter"
+            room.anyOn -> "${room.onLights.size} von ${room.lights.size}"
+            else -> "Licht aus"
+        },
+        selected = selected,
+        canToggle = room.lights.isNotEmpty(),
+        onBrightness = if (room.lights.isNotEmpty()) onBrightness else null,
+        onToggle = onToggle,
+        onClick = onOpen
+    ) { tint ->
         if (media.isNotEmpty()) {
-            Spacer(Modifier.height(if (big) 6.dp else 8.dp))
+            Spacer(Modifier.height(6.dp))
             media.forEach { (icon, name, state) ->
-                Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, null, tint = Muted, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "$name · $state",
-                        color = if (state == "spielt" || state == "an") Ink else Muted,
-                        fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
+                Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, null, tint = tint, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("$name · $state", color = tint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
     }
+}
+
+/** Gradient colours of a routine: the Hue colours it sets, else a stable palette. */
+fun routineColors(r: Routine): List<Color> {
+    val cols = r.variants.flatMap { it.actions }
+        .filter { it.target == com.nahuel.homeflow.data.TargetType.HUE }
+        .mapNotNull { hexColor(it.params["color"]) }
+        .distinct()
+    return if (cols.isEmpty()) paletteFor(r.id) else lightsGradient(cols)
 }
 
 /** "Undo <routine>" chip: restores the lights to how they were before the last run (15 min window). */

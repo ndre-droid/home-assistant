@@ -25,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -355,15 +358,23 @@ private fun RoutineCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(if (runFlash) AccentTint else Card)
+            .litCard()
+            .background(if (runFlash) AccentTint else Color.Transparent)
             .clickable(onClick = onOpen)
-            .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp)
+            .padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 14.dp)
     ) {
-        if (r.icon.isNotEmpty()) {
-            IconBox(40.dp) { Text(r.icon, fontSize = 18.sp) }
-        } else {
-            IconTile(routineVector(r), size = 40.dp, tint = if (r.enabled) AccentText else Muted)
+        val cols = routineColors(r)
+        Box(
+            Modifier
+                .size(44.dp)
+                .graphicsLayer { alpha = if (r.enabled) 1f else 0.45f }
+                .shadow(if (r.enabled) 10.dp else 0.dp, CircleShape, ambientColor = cols[1], spotColor = cols[1])
+                .clip(CircleShape)
+                .background(Brush.linearGradient(cols)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (r.icon.isNotEmpty()) Text(r.icon, fontSize = 18.sp)
+            else Icon(routineVector(r), null, tint = inkOn(cols).copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

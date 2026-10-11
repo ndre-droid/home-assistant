@@ -62,10 +62,12 @@ fun RoomScreen(roomId: String, modifier: Modifier = Modifier, onBack: (() -> Uni
     var showAssign by remember { mutableStateOf(false) }
     var activeMood by remember(roomId) { mutableStateOf<String?>(null) }
 
+    val roomGlow = room?.onLights?.firstOrNull()?.let { lightColor(it) } ?: Accent
     Column(
         modifier
             .fillMaxSize()
             .background(Bg)
+            .ambientGlow(roomGlow, cx = 0.5f, cy = 0.05f, radius = 0.8f, strength = if (room?.anyOn == true) 0.36f else 0.08f)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
@@ -102,17 +104,20 @@ fun RoomScreen(roomId: String, modifier: Modifier = Modifier, onBack: (() -> Uni
                         color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)
                     )
                     Text(
-                        "${room.avgBrightness}", color = Ink, fontSize = 44.sp, fontWeight = FontWeight.SemiBold,
-                        letterSpacing = (-1).sp, lineHeight = 44.sp
+                        "${room.avgBrightness}", color = Ink, fontSize = 56.sp, fontWeight = FontWeight.Medium,
+                        letterSpacing = (-2).sp, lineHeight = 58.sp,
+                        style = androidx.compose.ui.text.TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(roomGlow.copy(alpha = if (room.anyOn) 0.6f else 0f), blurRadius = 36f)
+                        )
                     )
                     Text(" %", color = Muted, fontSize = 20.sp, modifier = Modifier.padding(bottom = 4.dp))
                 }
-                Spacer(Modifier.height(6.dp))
-                LevelSlider(
+                Spacer(Modifier.height(12.dp))
+                BigBrightnessSlider(
                     room.avgBrightness,
-                    color = room.onLights.firstOrNull()?.let { lightColor(it) } ?: Faint
+                    colors = lightsGradient(room.onLights.map { lightColor(it) }.distinct())
                 ) { b -> scope.launch { HomeRepo.setLights(allIds, true, b) } }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     moods.forEach { m ->
                         MoodButton(m.name, hexColor(m.hex) ?: Color.White, selected = activeMood == m.name) {
@@ -135,7 +140,7 @@ fun RoomScreen(roomId: String, modifier: Modifier = Modifier, onBack: (() -> Uni
             Spacer(Modifier.height(20.dp))
             SectionTitle("Lichter")
             Spacer(Modifier.height(10.dp))
-            Column(Modifier.fillMaxWidth().clip(CardShape).background(Card)) {
+            Column(Modifier.fillMaxWidth().litCard()) {
                 room.lights.forEachIndexed { i, l ->
                     if (i > 0) Rule(Modifier.padding(horizontal = 16.dp))
                     RoomLightRow(
@@ -238,19 +243,10 @@ fun RoomScreen(roomId: String, modifier: Modifier = Modifier, onBack: (() -> Uni
 
 @Composable
 private fun MoodButton(name: String, color: Color, selected: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .then(if (selected) Modifier.border(2.dp, Accent, CircleShape).padding(4.dp) else Modifier)
-                .clip(CircleShape)
-                .background(color)
-                .clickable(role = Role.Button, onClick = onClick)
-                .semantics { contentDescription = "Stimmung $name" }
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(name, color = if (selected) Ink else Muted, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-    }
+    SceneOrb(
+        colors = listOf(androidx.compose.ui.graphics.lerp(color, Color.White, 0.45f), color, androidx.compose.ui.graphics.lerp(color, Color(0xFFD9506A), 0.3f)),
+        label = name, selected = selected, size = 40.dp, onClick = onClick
+    )
 }
 
 @Composable
@@ -264,15 +260,7 @@ private fun RoomLightRow(
 ) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onExpand).padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 44.dp)) {
-            Box(
-                Modifier
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .then(
-                        if (l.on) Modifier.background(lightColor(l))
-                        else Modifier.border(1.5.dp, Faint, CircleShape)
-                    )
-            )
+            LightOrb(lightColor(l), l.on, 22.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(l.name, color = Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
