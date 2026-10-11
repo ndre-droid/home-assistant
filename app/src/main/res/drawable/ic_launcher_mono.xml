@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 13+ themed icon: same mark, single colour (the launcher tints it). -->
+<!-- Android 13+ themed icon: the house of light, single colour (the launcher tints it). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="9"
-        android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M69,36 C69,26.5 38,26 38,41 C38,55 70,53 70,67 C70,82 41,83 38,74" />
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M69,36m-7.5,0a7.5,7.5 0,1 1,15 0a7.5,7.5 0,1 1,-15 0" />
+    <group android:translateX="21" android:translateY="19" android:scaleX="0.66" android:scaleY="0.66">
+        <path android:pathData="M27,77 V49 Q27,46 29.4,44 L47.6,28.6 Q50,26.6 52.4,28.6 L70.6,44 Q73,46 73,49 V77"
+            android:strokeWidth="8" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:strokeColor="#FFFFFF" android:fillColor="#00000000" />
+        <path android:pathData="M43.5,59 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0" android:fillColor="#FFFFFF" />
+    </group>
 </vector>

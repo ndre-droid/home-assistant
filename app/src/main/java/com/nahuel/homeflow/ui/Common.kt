@@ -43,6 +43,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -173,7 +177,7 @@ fun Modifier.pressScale(interaction: MutableInteractionSource): Modifier {
 }
 
 /** Soft coloured light behind a screen, like a lamp in a dark room. Put it after background(). */
-fun Modifier.ambientGlow(color: Color, cx: Float = 0.2f, cy: Float = -0.05f, radius: Float = 0.85f, strength: Float = 0.26f): Modifier =
+fun Modifier.ambientGlow(color: Color, cx: Float = 0.2f, cy: Float = -0.05f, radius: Float = 0.9f, strength: Float = 0.40f): Modifier =
     this.drawBehind {
         drawRect(
             Brush.radialGradient(
@@ -182,6 +186,23 @@ fun Modifier.ambientGlow(color: Color, cx: Float = 0.2f, cy: Float = -0.05f, rad
                 radius = size.maxDimension * radius
             )
         )
+    }
+
+/**
+ * Real soft light around a shape (blurred, coloured) – like CSS box-shadow glow.
+ * Put it BEFORE clip() so the light can spill outside the bounds.
+ */
+fun Modifier.glow(color: Color, radius: Dp = 18.dp, corner: Dp = 26.dp, alpha: Float = 0.6f, offsetY: Dp = 6.dp): Modifier =
+    this.drawBehind {
+        drawIntoCanvas { canvas ->
+            val paint = Paint().asFrameworkPaint().apply {
+                isAntiAlias = true
+                this.color = android.graphics.Color.TRANSPARENT
+                setShadowLayer(radius.toPx(), 0f, offsetY.toPx(), color.copy(alpha = alpha).toArgb())
+            }
+            val c = corner.toPx().coerceAtMost(size.minDimension / 2)
+            canvas.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, c, c, paint)
+        }
     }
 
 /** Lit card surface: soft shadow, gradient fill, edge of light on top. */
@@ -243,7 +264,7 @@ private fun FlatButtonBase(
             .defaultMinSize(minHeight = 44.dp)
             .graphicsLayer { this.alpha = alpha }
             .pressScale(interaction)
-            .then(if (glow != null && enabled) Modifier.shadow(10.dp, PillShape, ambientColor = glow, spotColor = glow) else Modifier)
+            .then(if (glow != null && enabled) Modifier.glow(glow, radius = 14.dp, corner = 30.dp, alpha = 0.55f, offsetY = 4.dp) else Modifier)
             .clip(PillShape)
             .then(if (fill != null) Modifier.background(fill).border(RuleWidth, EdgeLight, PillShape) else Modifier)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
@@ -307,7 +328,7 @@ fun IconBoxButton(
         modifier
             .size(s)
             .pressScale(interaction)
-            .then(if (fill != null) Modifier.shadow(10.dp, CircleShape, ambientColor = fill, spotColor = fill) else Modifier)
+            .then(if (fill != null) Modifier.glow(fill, radius = 14.dp, corner = s, alpha = 0.6f, offsetY = 4.dp) else Modifier)
             .clip(CircleShape)
             .background(
                 if (fill != null) Brush.radialGradient(listOf(lerp(fill, Color.White, 0.3f), fill))
@@ -363,7 +384,7 @@ fun FlatToggle(
         modifier
             .size(width = 46.dp, height = 28.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
-            .then(if (checked && !onColor && enabled) Modifier.shadow(8.dp, PillShape, ambientColor = accent, spotColor = accent) else Modifier)
+            .then(if (checked && !onColor && enabled) Modifier.glow(accent, radius = 10.dp, corner = 14.dp, alpha = 0.55f, offsetY = 2.dp) else Modifier)
             .clip(PillShape)
             .background(track)
             .border(RuleWidth, Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.2f), Color.White.copy(alpha = 0.10f))), PillShape)
@@ -457,7 +478,7 @@ fun BigBrightnessSlider(value: Int, colors: List<Color>, modifier: Modifier = Mo
                 .padding(4.dp)
                 .fillMaxHeight()
                 .fillMaxWidth(frac.coerceAtLeast(0.16f))
-                .shadow(14.dp, PillShape, ambientColor = glow, spotColor = glow)
+                .glow(glow, radius = 22.dp, corner = 28.dp, alpha = 0.7f, offsetY = 4.dp)
                 .clip(PillShape)
                 .background(Brush.horizontalGradient(colors))
                 .drawBehind {
@@ -670,7 +691,7 @@ fun SceneOrb(
                 .pressScale(interaction)
                 .then(if (selected) Modifier.border(2.dp, Accent, CircleShape) else Modifier)
                 .padding(4.dp)
-                .shadow(12.dp, CircleShape, ambientColor = glow, spotColor = glow)
+                .glow(glow, radius = 16.dp, corner = size, alpha = 0.7f, offsetY = 6.dp)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(colors))
                 .drawBehind {
@@ -706,7 +727,7 @@ fun LightOrb(color: Color, on: Boolean, size: Dp = 26.dp) {
         Box(
             Modifier
                 .size(size)
-                .shadow(10.dp, CircleShape, ambientColor = color, spotColor = color)
+                .glow(color, radius = 12.dp, corner = size, alpha = 0.9f, offsetY = 0.dp)
                 .clip(CircleShape)
                 .background(Brush.radialGradient(listOf(lerp(color, Color.White, 0.75f), color)))
         )
@@ -752,7 +773,7 @@ fun DimmerCard(
             .fillMaxWidth()
             .defaultMinSize(minHeight = minHeight)
             .then(if (selected) Modifier.border(2.dp, Accent, RoundedCornerShape(29.dp)).padding(3.dp) else Modifier)
-            .shadow(if (on) 16.dp else 8.dp, shape, ambientColor = if (on) glow else Color.Black, spotColor = if (on) glow else Color.Black)
+            .then(if (on) Modifier.glow(glow, radius = 24.dp, corner = 26.dp, alpha = 0.65f, offsetY = 10.dp) else Modifier.shadow(8.dp, shape))
             .clip(shape)
             .background(if (on) Brush.linearGradient(colors) else CardBrush)
             .border(RuleWidth, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (on) 0.5f else 0.08f), Color.Transparent)), shape)
