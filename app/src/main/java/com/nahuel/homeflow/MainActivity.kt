@@ -17,7 +17,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.nahuel.homeflow.data.Store
 import com.nahuel.homeflow.ui.HomeFlowTheme
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
@@ -132,7 +134,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { AUTOMATIONS("Automationen"), DEVICES("Geräte"), SETTINGS("Einstellungen") }
+private enum class Tab(val label: String) { HOME("Zuhause"), AUTOMATIONS("Flows"), DEVICES("Geräte"), SETTINGS("Einstellungen") }
 
 @Composable
 private fun AppRoot(
@@ -140,35 +142,62 @@ private fun AppRoot(
     onRequestNfcWrite: (String) -> Unit,
     onCancelNfcWrite: () -> Unit
 ) {
-    var tab by remember { mutableStateOf(Tab.AUTOMATIONS) }
+    var tab by remember { mutableStateOf(Tab.HOME) }
     var editRoutineId by remember { mutableStateOf<String?>(null) }   // null = list, "" = new
     var showEditor by remember { mutableStateOf(false) }
     var showCapture by remember { mutableStateOf(false) }
 
+    // Keep content clear of the camera cutout in every rotation (cover + inner display).
+    val cutout = Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+
     if (showCapture) {
-        SceneCaptureScreen(onClose = { showCapture = false })
+        Box(Modifier.fillMaxSize().background(Bg).then(cutout)) { SceneCaptureScreen(onClose = { showCapture = false }) }
     } else if (showEditor) {
-        EditRoutineScreen(
-            routineId = editRoutineId,
-            onClose = { showEditor = false },
-            onRequestNfcWrite = onRequestNfcWrite
-        )
+        Box(Modifier.fillMaxSize().background(Bg).then(cutout)) {
+            EditRoutineScreen(
+                routineId = editRoutineId,
+                onClose = { showEditor = false },
+                onRequestNfcWrite = onRequestNfcWrite
+            )
+        }
     } else {
-        Scaffold(
-            containerColor = Bg,
-            bottomBar = {
-                SlimNavBar(
-                    labels = Tab.entries.map { it.label },
-                    current = tab.ordinal,
-                    onSelect = { tab = Tab.entries[it] }
-                )
-            }
-        ) { pad ->
-            val mod = Modifier.padding(pad)
+        val content: @Composable (Modifier) -> Unit = { mod ->
             when (tab) {
+                Tab.HOME -> HomeScreen(mod, onOpenDevices = { tab = Tab.DEVICES }, onOpenFlows = { tab = Tab.AUTOMATIONS })
                 Tab.AUTOMATIONS -> AutomationsScreen(mod, onEdit = { id -> editRoutineId = id; showEditor = true }, onCaptureScene = { showCapture = true })
                 Tab.DEVICES -> DevicesScreen(mod)
                 Tab.SETTINGS -> SettingsScreen(mod)
+            }
+        }
+        BoxWithConstraints(Modifier.fillMaxSize().background(Bg)) {
+            // Wide windows (cover screen landscape, inner display) get a side rail; phones a floating pill.
+            if (maxWidth >= 600.dp) {
+                Row(Modifier.fillMaxSize().then(cutout)) {
+                    Box(
+                        Modifier.fillMaxHeight().width(84.dp).systemBarsPadding().padding(vertical = 16.dp),
+                        contentAlignment = if (maxHeight < 600.dp) Alignment.Center else Alignment.TopCenter
+                    ) {
+                        NavRailPill(
+                            labels = Tab.entries.map { it.label },
+                            current = tab.ordinal,
+                            onSelect = { tab = Tab.entries[it] }
+                        )
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight().navigationBarsPadding()) { content(Modifier) }
+                }
+            } else {
+                Scaffold(
+                    containerColor = Bg,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    bottomBar = {
+                        SlimNavBar(
+                            labels = Tab.entries.map { it.label },
+                            current = tab.ordinal,
+                            onSelect = { tab = Tab.entries[it] }
+                        )
+                    },
+                    modifier = cutout
+                ) { pad -> content(Modifier.padding(pad)) }
             }
         }
     }
