@@ -171,11 +171,12 @@ private fun AppRoot(
         }
         BoxWithConstraints(Modifier.fillMaxSize().background(Bg)) {
             // Wide windows (cover screen landscape, inner display) get a side rail; phones a floating pill.
+            val shortWindow = maxHeight < 600.dp
             if (maxWidth >= 600.dp) {
                 Row(Modifier.fillMaxSize().then(cutout)) {
                     Box(
                         Modifier.fillMaxHeight().width(84.dp).systemBarsPadding().padding(vertical = 16.dp),
-                        contentAlignment = if (maxHeight < 600.dp) Alignment.Center else Alignment.TopCenter
+                        contentAlignment = if (shortWindow) Alignment.Center else Alignment.TopCenter
                     ) {
                         NavRailPill(
                             labels = Tab.entries.map { it.label },
