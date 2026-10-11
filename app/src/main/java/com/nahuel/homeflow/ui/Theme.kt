@@ -13,49 +13,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-// ---- HomeFlow "Glow" palette ----
-// Warm near-black ground, ONE accent (the colour of light), warm neutrals.
-// Colour comes from the lights themselves (gradients on cards), not from chrome.
-private val Amber = Color(0xFFF0B45E)
-private val Coral = Color(0xFFF0705A)
+// ---- Brand palette: Spotify/YouTube language ----
+// Neutral near-black canvas, ONE saturated accent, gray steps for everything else.
+private val AccentGreen  = Color(0xFF1ED760)   // default accent (changeable in settings)
+private val BrandPink    = Color(0xFFF2649E)
+private val BrandGreenOk = Color(0xFF1ED760)
 
+// Dark: YouTube's pure near-black + Spotify's gray steps. No blue tint, no borders.
 private val DarkScheme = darkColorScheme(
-    primary = Amber,
-    onPrimary = Color(0xFF17130A),
-    secondary = Amber,
-    onSecondary = Color(0xFF17130A),
-    tertiary = Coral,
-    background = Color(0xFF0B0C0D),
-    onBackground = Color(0xFFEDEBE7),
-    surface = Color(0xFF17191C),          // card
-    onSurface = Color(0xFFEDEBE7),
-    surfaceVariant = Color(0xFF22252A),   // inset fill / chips / tracks
-    onSurfaceVariant = Color(0xFFA3A19C), // muted text
-    outline = Color(0xFF26292D),
-    outlineVariant = Color(0xFF1F2225),
-    error = Color(0xFFFF8A7A)
+    primary = AccentGreen,
+    onPrimary = Color(0xFF0D0D0D),         // black-on-green, like Spotify's play button
+    secondary = AccentGreen,
+    tertiary = BrandPink,
+    background = Color(0xFF0F0F0F),
+    onBackground = Color(0xFFF1F1F1),
+    surface = Color(0xFF1B1B1B),           // card step
+    onSurface = Color(0xFFF1F1F1),
+    surfaceVariant = Color(0xFF272727),    // chip/control step (YouTube chip gray)
+    onSurfaceVariant = Color(0xFFAAAAAA),  // muted text
+    outline = Color(0xFF2A2A2A),
+    outlineVariant = Color(0xFF232323),
+    error = Color(0xFFF26D6D)
 )
 
+// Light: YouTube light — white canvas, gray chips, near-black text, deep green accent.
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFFA35F0C),
+    primary = Color(0xFF12833B),
     onPrimary = Color.White,
-    secondary = Color(0xFFA35F0C),
-    onSecondary = Color.White,
-    tertiary = Color(0xFFC2453E),
-    background = Color(0xFFF4F3F0),
-    onBackground = Color(0xFF1A1B1C),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1A1B1C),
-    surfaceVariant = Color(0xFFECEBE6),
-    onSurfaceVariant = Color(0xFF5F5D59),
-    outline = Color(0xFFE2E0DB),
-    outlineVariant = Color(0xFFE8E6E1),
-    error = Color(0xFFB3261E)
+    secondary = Color(0xFF12833B),
+    tertiary = Color(0xFFC33C7E),
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF0F0F0F),
+    surface = Color(0xFFF2F2F2),
+    onSurface = Color(0xFF0F0F0F),
+    surfaceVariant = Color(0xFFE5E5E5),
+    onSurfaceVariant = Color(0xFF606060),
+    outline = Color(0xFFDDDDDD),
+    outlineVariant = Color(0xFFE8E8E8),
+    error = Color(0xFFCC3D33)
 )
 
 /** Theme mode preference. Stored in Config.themeMode. */
@@ -73,15 +71,10 @@ val TextPrim: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorS
 val TextSec: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val Hairline: Color @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline
 
-/** True when the current scheme is dark (works for dynamic colour too). */
-val IsDark: Boolean @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-/** Card fill: a hair lighter at the top so cards read as softly lit, not flat. */
 val CardGradient: Brush
     @Composable @ReadOnlyComposable get() {
         val s = MaterialTheme.colorScheme.surface
-        val top = if (IsDark) Color.White.copy(alpha = 0.035f).compositeOver(s) else s
-        return Brush.verticalGradient(listOf(top, s))
+        return Brush.verticalGradient(listOf(s, s))
     }
 val AccentGradient: Brush
     @Composable @ReadOnlyComposable get() =
@@ -114,17 +107,15 @@ fun HomeFlowTheme(
     val scheme = if (accent != null) base.copy(
         primary = accent,
         secondary = accent,
-        onPrimary = if (accentIsLight(accent)) Color(0xFF17130A) else Color.White,
-        onSecondary = if (accentIsLight(accent)) Color(0xFF17130A) else Color.White
+        // keep icon/text on the accent readable for light accents
+        onPrimary = if (accentIsLight(accent)) Color(0xFF0D0D0D) else Color.White
     ) else base
     MaterialTheme(
         colorScheme = scheme,
         shapes = Shapes(
-            extraSmall = RoundedCornerShape(10.dp),
             small = RoundedCornerShape(14.dp),
-            medium = RoundedCornerShape(22.dp),
-            large = RoundedCornerShape(28.dp),
-            extraLarge = RoundedCornerShape(32.dp)
+            medium = RoundedCornerShape(18.dp),
+            large = RoundedCornerShape(24.dp)
         ),
         content = content
     )
